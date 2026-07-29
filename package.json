@@ -1,0 +1,46 @@
+{
+  "name": "localdrop",
+  "version": "1.0.0",
+  "description": "Share files and text between devices on the same network — no internet, no accounts",
+  "type": "module",
+  "license": "MIT",
+  "author": "Mohit Sharma <mohit.sha701485@gmail.com>",
+  "keywords": [
+    "file-sharing",
+    "lan",
+    "local",
+    "transfer",
+    "qr-code",
+    "cli",
+    "wifi"
+  ],
+  "bin": {
+    "localdrop": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc && node scripts/copy-ui.mjs",
+    "start": "node dist/cli.js",
+    "prestart": "npm run build",
+    "prepublishOnly": "npm run build",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "busboy": "^1.6.0",
+    "hono": "^4.7.0",
+    "@hono/node-server": "^1.14.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/busboy": "^1.5.4",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
