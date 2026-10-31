@@ -36,20 +36,23 @@ function readUI(filename: string): string {
 export function createApp(outputDir: string): Hono {
   const app = new Hono();
 
-  // --- Lobby (no auth) ---
+  // --- Pages ---
 
-  app.get("/", (c) => c.html(readUI("lobby.html")));
-
-  // --- Room chat page ---
+  app.get("/", (c) => {
+    const html = readUI("index.html")
+      .replace("__ROOM_ID__", "")
+      .replace("__ROOM_NAME__", "");
+    return c.html(html);
+  });
 
   app.get("/room/:id", (c) => {
     const roomId = c.req.param("id");
     const name = getRoomName(roomId);
     if (!name) return c.redirect("/");
-    const html = readUI("index.html").replace(
-      "__ROOM_NAME__",
-      name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;"),
-    );
+    const escaped = name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const html = readUI("index.html")
+      .replace("__ROOM_ID__", roomId)
+      .replace("__ROOM_NAME__", escaped);
     return c.html(html);
   });
 

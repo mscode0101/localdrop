@@ -19,22 +19,186 @@
     --success: #34d399;
     --danger: #f87171;
     --radius: 12px;
+    --sidebar-w: 320px;
   }
 
-  html, body {
-    height: 100%;
-    overflow: hidden;
-  }
+  html, body { height: 100%; overflow: hidden; }
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
-    display: flex;
-    flex-direction: column;
   }
 
-  .header {
+  /* ===== App layout ===== */
+  .app { display: flex; height: 100%; }
+
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* ===== Sidebar ===== */
+  .sidebar-header {
+    padding: 20px 16px 16px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sidebar-header h1 { font-size: 20px; font-weight: 700; }
+  .sidebar-header h1 span { color: var(--accent); }
+  .sidebar-header p { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+  .room-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rooms-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .room-card {
+    background: var(--bubble);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    animation: fadeIn 0.15s ease;
+  }
+  .room-card:hover { background: #232325; }
+  .room-card.active {
+    border-color: var(--accent);
+    background: rgba(79, 158, 255, 0.08);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .room-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #7c5cff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .room-info { flex: 1; min-width: 0; }
+  .room-name {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .room-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+  }
+
+  .btn-join {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .btn-join:hover { background: var(--accent-hover); }
+
+  .sidebar-footer {
+    border-top: 1px solid var(--border);
+    padding: 10px;
+    flex-shrink: 0;
+  }
+  .btn-create {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-create:hover { background: var(--accent-hover); }
+
+  /* ===== Main: no room selected ===== */
+  .no-room {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    gap: 16px;
+    padding: 24px;
+  }
+  .no-room-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, var(--accent), #7c5cff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+  }
+  .no-room p { font-size: 15px; text-align: center; line-height: 1.5; }
+  .no-room .hint { font-size: 13px; }
+
+  /* ===== Main: chat header ===== */
+  .room-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+  .chat-header {
     padding: 12px 16px;
     display: flex;
     align-items: center;
@@ -52,7 +216,7 @@
     background: var(--border);
     color: var(--text);
     cursor: pointer;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
@@ -76,13 +240,8 @@
     align-items: center;
     gap: 4px;
   }
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--success);
-  }
 
+  /* ===== Chat messages ===== */
   .chat {
     flex: 1;
     overflow-y: auto;
@@ -112,11 +271,6 @@
     max-width: 85%;
     position: relative;
     animation: fadeIn 0.15s ease;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 
   .msg-text {
@@ -167,10 +321,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .msg-file-size {
-    font-size: 12px;
-    color: var(--text-dim);
-  }
+  .msg-file-size { font-size: 12px; color: var(--text-dim); }
 
   .msg-footer {
     display: flex;
@@ -179,14 +330,8 @@
     margin-top: 6px;
     gap: 8px;
   }
-  .msg-time {
-    font-size: 11px;
-    color: var(--text-dim);
-  }
-  .msg-actions {
-    display: flex;
-    gap: 4px;
-  }
+  .msg-time { font-size: 11px; color: var(--text-dim); }
+  .msg-actions { display: flex; gap: 4px; }
 
   .btn-icon {
     width: 30px;
@@ -222,6 +367,7 @@
   }
   .btn-dl:hover { background: var(--accent-hover); }
 
+  /* ===== Compose ===== */
   .compose {
     border-top: 1px solid var(--border);
     background: var(--surface);
@@ -271,10 +417,7 @@
     line-height: 1.4;
     overflow-y: auto;
   }
-  .compose-input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
+  .compose-input:focus { outline: none; border-color: var(--accent); }
 
   .compose-send {
     width: 40px;
@@ -294,6 +437,7 @@
   .compose-send:hover { background: var(--accent-hover); }
   .compose-send:disabled { opacity: 0.4; cursor: default; }
 
+  /* ===== Upload progress ===== */
   .upload-progress {
     border-top: 1px solid var(--border);
     background: var(--surface);
@@ -302,46 +446,17 @@
   }
   .upload-progress:empty { display: none; padding: 0; border: none; }
 
-  .progress-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 4px 0;
-  }
-  .progress-item-name {
-    font-size: 12px;
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .progress-item-pct {
-    font-size: 12px;
-    color: var(--accent);
-    width: 40px;
-    text-align: right;
-    flex-shrink: 0;
-  }
+  .progress-item { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+  .progress-item-name { font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .progress-item-pct { font-size: 12px; color: var(--accent); width: 40px; text-align: right; flex-shrink: 0; }
   .progress-item-pct.done { color: var(--success); }
   .progress-item-pct.error { color: var(--danger); }
-  .progress-item-bar {
-    width: 80px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .progress-item-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: width 0.2s;
-    width: 0%;
-  }
+  .progress-item-bar { width: 80px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .progress-item-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.2s; width: 0%; }
   .progress-item-fill.done { background: var(--success); }
   .progress-item-fill.error { background: var(--danger); }
 
+  /* ===== Toast ===== */
   .toast {
     position: fixed;
     bottom: 80px;
@@ -366,49 +481,195 @@
     color: var(--text-dim);
     padding: 8px 0 4px;
   }
+
+  /* ===== Modals ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 360px;
+    animation: fadeIn 0.15s ease;
+  }
+  .modal h2 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+  .modal label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+  .modal label:first-of-type { margin-top: 0; }
+  .modal input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-error { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-btns button {
+    flex: 1;
+    padding: 11px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-cancel { background: var(--border); color: var(--text); }
+  .btn-cancel:hover { background: #333; }
+  .btn-confirm { background: var(--accent); color: #fff; }
+  .btn-confirm:hover { background: var(--accent-hover); }
+  .btn-confirm:disabled { opacity: 0.5; cursor: default; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 767px) {
+    :root { --sidebar-w: 100%; }
+    .sidebar {
+      width: 100%;
+      border-right: none;
+      flex: 1;
+    }
+    .app { flex-direction: column; }
+    .sidebar.hidden { display: none; }
+    .main.hidden { display: none; }
+    .main { width: 100%; flex: 1; }
+    .btn-back { display: flex; }
+  }
+
+  @media (min-width: 768px) {
+    .btn-back { display: none; }
+    .no-room { display: flex; }
+    .msg { max-width: 70%; }
+  }
+
+  @media (min-width: 1200px) {
+    :root { --sidebar-w: 360px; }
+  }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <button class="btn-back" id="backBtn" title="Leave room">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-  </button>
-  <div class="header-info">
-    <div class="header-name" id="roomName">__ROOM_NAME__</div>
-    <div class="header-status"><span class="dot"></span><span id="onlineCount">0</span> online</div>
+<div class="app">
+  <!-- Sidebar: room list -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1><span>Local</span>Drop</h1>
+      <p>Rooms on your network</p>
+    </div>
+    <div class="room-list" id="rooms">
+      <div class="rooms-empty" id="roomsEmpty">No rooms yet.<br>Create one to start sharing.</div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn-create" id="createBtn">+ Create Room</button>
+    </div>
+  </aside>
+
+  <!-- Main: chat or empty state -->
+  <main class="main hidden" id="main">
+    <!-- No room selected -->
+    <div class="no-room" id="noRoom">
+      <div class="no-room-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <p>Select a room to start sharing</p>
+      <p class="hint">or create a new one</p>
+    </div>
+
+    <!-- Room chat view -->
+    <div class="room-view" id="roomView" style="display:none">
+      <div class="chat-header">
+        <button class="btn-back" id="backBtn" title="Leave room">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="header-info">
+          <div class="header-name" id="roomName">__ROOM_NAME__</div>
+          <div class="header-status"><span class="dot"></span><span id="onlineCount">0</span> online</div>
+        </div>
+      </div>
+
+      <div class="chat" id="chat">
+        <div class="chat-empty" id="chatEmpty">Send text or files to share<br>with everyone in this room</div>
+      </div>
+
+      <div class="upload-progress" id="uploadProgress"></div>
+
+      <div class="compose">
+        <label class="compose-attach" title="Attach files">
+          +
+          <input type="file" id="fileInput" multiple>
+        </label>
+        <textarea class="compose-input" id="textInput" placeholder="Type a message..." rows="1"></textarea>
+        <button class="compose-send" id="sendBtn" title="Send">&#9654;</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Create Room modal -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <h2>Create a Room</h2>
+    <label for="createName">Room name</label>
+    <input type="text" id="createName" placeholder="e.g. Design Team" maxlength="50" autocomplete="off">
+    <label for="createPass">Password</label>
+    <input type="password" id="createPass" placeholder="Set a password" autocomplete="off">
+    <div class="modal-error" id="createError"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="createCancel">Cancel</button>
+      <button class="btn-confirm" id="createConfirm">Create</button>
+    </div>
   </div>
 </div>
 
-<div class="chat" id="chat">
-  <div class="chat-empty" id="chatEmpty">
-    Send text or files to share<br>with everyone in this room
+<!-- Join Room modal -->
+<div class="modal-overlay" id="joinModal">
+  <div class="modal">
+    <h2 id="joinTitle">Join Room</h2>
+    <label for="joinPass">Password</label>
+    <input type="password" id="joinPass" placeholder="Enter room password" autocomplete="off">
+    <div class="modal-error" id="joinError"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="joinCancel">Cancel</button>
+      <button class="btn-confirm" id="joinConfirm">Join</button>
+    </div>
   </div>
-</div>
-
-<div class="upload-progress" id="uploadProgress"></div>
-
-<div class="compose">
-  <label class="compose-attach" title="Attach files">
-    +
-    <input type="file" id="fileInput" multiple>
-  </label>
-  <textarea class="compose-input" id="textInput" placeholder="Type a message..." rows="1"></textarea>
-  <button class="compose-send" id="sendBtn" title="Send">&#9654;</button>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const ROOM_ID = window.location.pathname.split("/")[2];
+const ROOM_ID = "__ROOM_ID__" || null;
 const TOKEN = new URLSearchParams(window.location.search).get("t");
-const API = "/api/rooms/" + ROOM_ID;
-const headers = { "X-Token": TOKEN };
+const API = ROOM_ID ? "/api/rooms/" + ROOM_ID : null;
+const headers = TOKEN ? { "X-Token": TOKEN } : {};
+const isMobile = window.innerWidth < 768;
 
-if (!TOKEN || !ROOM_ID) {
-  window.location.href = "/";
-}
-
+const SVG_LOCK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 const SVG_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 const SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 const SVG_TRASH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
@@ -420,6 +681,195 @@ function esc(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+
+// ===== Layout: show sidebar or chat depending on state =====
+function updateLayout() {
+  const sidebar = document.getElementById("sidebar");
+  const main = document.getElementById("main");
+  const noRoom = document.getElementById("noRoom");
+  const roomView = document.getElementById("roomView");
+
+  if (isMobile) {
+    if (ROOM_ID && TOKEN) {
+      sidebar.classList.add("hidden");
+      main.classList.remove("hidden");
+      noRoom.style.display = "none";
+      roomView.style.display = "flex";
+    } else {
+      sidebar.classList.remove("hidden");
+      main.classList.add("hidden");
+    }
+  } else {
+    sidebar.classList.remove("hidden");
+    main.classList.remove("hidden");
+    if (ROOM_ID && TOKEN) {
+      noRoom.style.display = "none";
+      roomView.style.display = "flex";
+    } else {
+      noRoom.style.display = "flex";
+      roomView.style.display = "none";
+    }
+  }
+}
+
+updateLayout();
+
+// ===== Sidebar: room list =====
+let joinRoomId = null;
+
+function renderRooms(rooms) {
+  const container = document.getElementById("rooms");
+  const empty = document.getElementById("roomsEmpty");
+  container.querySelectorAll(".room-card").forEach((n) => n.remove());
+
+  if (!rooms || rooms.length === 0) {
+    empty.style.display = "";
+    return;
+  }
+  empty.style.display = "none";
+
+  for (const room of rooms) {
+    const isActive = room.id === ROOM_ID;
+    const card = document.createElement("div");
+    card.className = "room-card" + (isActive ? " active" : "");
+    card.innerHTML =
+      '<div class="room-icon">' + SVG_LOCK + '</div>' +
+      '<div class="room-info">' +
+        '<div class="room-name">' + esc(room.name) + '</div>' +
+        '<div class="room-meta"><span class="dot"></span>' + room.online + ' online</div>' +
+      '</div>' +
+      (isActive ? '' : '<button class="btn-join">Join</button>');
+
+    if (isActive) {
+      card.style.cursor = "default";
+    } else {
+      const btn = card.querySelector(".btn-join");
+      const openJoin = () => {
+        joinRoomId = room.id;
+        document.getElementById("joinTitle").textContent = 'Join "' + room.name + '"';
+        document.getElementById("joinPass").value = "";
+        document.getElementById("joinError").style.display = "none";
+        document.getElementById("joinModal").classList.add("show");
+        document.getElementById("joinPass").focus();
+      };
+      if (btn) btn.addEventListener("click", (e) => { e.stopPropagation(); openJoin(); });
+      card.addEventListener("click", openJoin);
+    }
+    container.appendChild(card);
+  }
+}
+
+async function loadRooms() {
+  try {
+    const res = await fetch("/api/rooms");
+    const data = await res.json();
+    renderRooms(data.rooms);
+  } catch (e) {
+    console.error("Failed to load rooms", e);
+  }
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = "block";
+}
+
+// Create room
+document.getElementById("createBtn").addEventListener("click", () => {
+  document.getElementById("createName").value = "";
+  document.getElementById("createPass").value = "";
+  document.getElementById("createError").style.display = "none";
+  document.getElementById("createModal").classList.add("show");
+  document.getElementById("createName").focus();
+});
+
+document.getElementById("createCancel").addEventListener("click", () => {
+  document.getElementById("createModal").classList.remove("show");
+});
+
+document.getElementById("createConfirm").addEventListener("click", async () => {
+  const name = document.getElementById("createName").value.trim();
+  const password = document.getElementById("createPass").value;
+  if (!name) { showError("createError", "Room name is required"); return; }
+  if (!password) { showError("createError", "Password is required"); return; }
+
+  const btn = document.getElementById("createConfirm");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, password }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      window.location.href = "/room/" + data.id + "?t=" + data.token;
+    } else {
+      showError("createError", data.error || "Failed to create room");
+    }
+  } catch {
+    showError("createError", "Connection failed");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Join room
+document.getElementById("joinCancel").addEventListener("click", () => {
+  document.getElementById("joinModal").classList.remove("show");
+  joinRoomId = null;
+});
+
+document.getElementById("joinConfirm").addEventListener("click", async () => {
+  const password = document.getElementById("joinPass").value;
+  if (!password) { showError("joinError", "Password is required"); return; }
+
+  const btn = document.getElementById("joinConfirm");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/rooms/" + joinRoomId + "/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      window.location.href = "/room/" + joinRoomId + "?t=" + data.token;
+    } else {
+      showError("joinError", "Wrong password");
+    }
+  } catch {
+    showError("joinError", "Connection failed");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Keyboard shortcuts for modals
+document.getElementById("createName").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("createPass").focus();
+});
+document.getElementById("createPass").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("createConfirm").click();
+});
+document.getElementById("joinPass").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("joinConfirm").click();
+});
+
+// Close modals on overlay click
+document.getElementById("createModal").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) document.getElementById("createCancel").click();
+});
+document.getElementById("joinModal").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) document.getElementById("joinCancel").click();
+});
+
+loadRooms();
+setInterval(loadRooms, 3000);
+
+// ===== Chat functionality (only when in a room) =====
+if (ROOM_ID && TOKEN) {
 
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -455,9 +905,7 @@ function scrollToBottom() {
 }
 
 async function copyText(text, btn) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
+  try { await navigator.clipboard.writeText(text); } catch {
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.style.cssText = "position:fixed;left:-9999px";
@@ -476,7 +924,6 @@ function renderMessage(msg) {
   const div = document.createElement("div");
   div.className = "msg";
   div.dataset.id = msg.id;
-
   const isLong = msg.type === "text" && (msg.text.length > 300 || msg.text.split("\n").length > 6);
 
   let content = "";
@@ -487,7 +934,6 @@ function renderMessage(msg) {
   }
 
   const copyData = msg.type === "text" ? msg.text : msg.name;
-
   div.innerHTML = content + '<div class="msg-footer"><span class="msg-time">' + formatTime(msg.timestamp) + '</span><div class="msg-actions"><button class="btn-icon btn-copy" title="Copy">' + SVG_COPY + '</button><button class="btn-icon btn-del" title="Delete">' + SVG_TRASH + "</button></div></div>";
 
   div.querySelector(".btn-copy").addEventListener("click", function() { copyText(copyData, this); });
@@ -502,7 +948,6 @@ function renderMessage(msg) {
       moreBtn.textContent = expanded ? "Show more" : "Show less";
     });
   }
-
   return div;
 }
 
@@ -523,25 +968,16 @@ function setEmptyVisible(visible) {
   if (empty) empty.style.display = visible ? "" : "none";
 }
 
-function clearRenderedMessages() {
-  document.querySelectorAll("#chat .msg, #chat .day-sep").forEach((n) => n.remove());
-}
-
 async function loadMessages() {
   try {
     const res = await fetch(API + "/messages?t=" + TOKEN);
     if (res.status === 401) { window.location.href = "/"; return; }
     const data = await res.json();
     const chat = document.getElementById("chat");
-
-    clearRenderedMessages();
+    document.querySelectorAll("#chat .msg, #chat .day-sep").forEach((n) => n.remove());
     lastRenderedDate = "";
 
-    if (!data.messages || data.messages.length === 0) {
-      setEmptyVisible(true);
-      return;
-    }
-
+    if (!data.messages || data.messages.length === 0) { setEmptyVisible(true); return; }
     setEmptyVisible(false);
 
     for (const msg of data.messages) {
@@ -559,7 +995,6 @@ async function sendText() {
   const input = document.getElementById("textInput");
   const text = input.value.trim();
   if (!text) return;
-
   const btn = document.getElementById("sendBtn");
   btn.disabled = true;
   try {
@@ -569,86 +1004,49 @@ async function sendText() {
       body: JSON.stringify({ text }),
     });
     if (res.status === 401) { window.location.href = "/"; return; }
-    if (res.ok) {
-      input.value = "";
-      input.style.height = "auto";
-    }
-  } catch (e) {
-    console.error("Send failed", e);
-  } finally {
-    btn.disabled = false;
-    input.focus();
-  }
+    if (res.ok) { input.value = ""; input.style.height = "auto"; }
+  } catch (e) { console.error("Send failed", e); }
+  finally { btn.disabled = false; input.focus(); }
 }
 
 function uploadFiles(fileList) {
   if (!fileList || fileList.length === 0) return;
   const progress = document.getElementById("uploadProgress");
-
   for (const file of fileList) {
     const item = document.createElement("div");
     item.className = "progress-item";
     item.innerHTML = '<span class="progress-item-name">' + esc(file.name) + '</span><div class="progress-item-bar"><div class="progress-item-fill"></div></div><span class="progress-item-pct">0%</span>';
     progress.appendChild(item);
-
     const fill = item.querySelector(".progress-item-fill");
     const pct = item.querySelector(".progress-item-pct");
-
     const form = new FormData();
     form.append("file", file);
-
     const xhr = new XMLHttpRequest();
     xhr.open("POST", API + "/messages/file?t=" + TOKEN);
     xhr.setRequestHeader("X-Token", TOKEN);
-
     xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) {
-        const p = Math.round((e.loaded / e.total) * 100);
-        fill.style.width = p + "%";
-        pct.textContent = p + "%";
-      }
+      if (e.lengthComputable) { const p = Math.round((e.loaded / e.total) * 100); fill.style.width = p + "%"; pct.textContent = p + "%"; }
     });
-
     xhr.addEventListener("load", () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        fill.style.width = "100%";
-        fill.classList.add("done");
-        pct.textContent = "Done";
-        pct.classList.add("done");
+        fill.style.width = "100%"; fill.classList.add("done"); pct.textContent = "Done"; pct.classList.add("done");
         showToast(file.name + " sent");
         setTimeout(() => item.remove(), 2000);
-      } else if (xhr.status === 401) {
-        window.location.href = "/";
-      } else {
-        fill.classList.add("error");
-        pct.textContent = "Error";
-        pct.classList.add("error");
-      }
+      } else if (xhr.status === 401) { window.location.href = "/"; }
+      else { fill.classList.add("error"); pct.textContent = "Error"; pct.classList.add("error"); }
     });
-
-    xhr.addEventListener("error", () => {
-      fill.classList.add("error");
-      pct.textContent = "Failed";
-      pct.classList.add("error");
-    });
-
+    xhr.addEventListener("error", () => { fill.classList.add("error"); pct.textContent = "Failed"; pct.classList.add("error"); });
     xhr.send(form);
   }
 }
 
 async function deleteMsg(id) {
-  try {
-    await fetch(API + "/messages/" + id + "?t=" + TOKEN, { method: "DELETE", headers });
-    removeMessage(id);
-  } catch (e) {
-    console.error("Delete failed", e);
-  }
+  try { await fetch(API + "/messages/" + id + "?t=" + TOKEN, { method: "DELETE", headers }); removeMessage(id); }
+  catch (e) { console.error("Delete failed", e); }
 }
 
-// Back button
-document.getElementById("backBtn").addEventListener("click", () => {
-  window.location.href = "/";
-});
+// Back button (mobile only)
+document.getElementById("backBtn").addEventListener("click", () => { window.location.href = "/"; });
 
 // Compose handlers
 const textInput = document.getElementById("textInput");
@@ -659,37 +1057,21 @@ textInput.addEventListener("input", () => {
   textInput.style.height = "auto";
   textInput.style.height = Math.min(textInput.scrollHeight, 120) + "px";
 });
-
-textInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendText();
-  }
-});
-
+textInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } });
 sendBtn.addEventListener("click", sendText);
+fileInput.addEventListener("change", () => { uploadFiles(fileInput.files); fileInput.value = ""; });
 
-fileInput.addEventListener("change", () => {
-  uploadFiles(fileInput.files);
-  fileInput.value = "";
-});
-
-const chat = document.getElementById("chat");
-chat.addEventListener("dragover", (e) => { e.preventDefault(); });
-chat.addEventListener("drop", (e) => {
-  e.preventDefault();
-  uploadFiles(e.dataTransfer.files);
-});
+const chatEl = document.getElementById("chat");
+chatEl.addEventListener("dragover", (e) => { e.preventDefault(); });
+chatEl.addEventListener("drop", (e) => { e.preventDefault(); uploadFiles(e.dataTransfer.files); });
 
 const knownIds = new Set();
 
 function appendMessage(msg) {
   if (knownIds.has(msg.id)) return;
   knownIds.add(msg.id);
-
   const chat = document.getElementById("chat");
   setEmptyVisible(false);
-
   const sep = renderDateSeparator(msg.timestamp);
   if (sep) chat.appendChild(sep);
   chat.appendChild(renderMessage(msg));
@@ -700,9 +1082,7 @@ function removeMessage(id) {
   knownIds.delete(id);
   const el = document.querySelector('.msg[data-id="' + id + '"]');
   if (el) el.remove();
-  if (!document.querySelector("#chat .msg")) {
-    setEmptyVisible(true);
-  }
+  if (!document.querySelector("#chat .msg")) setEmptyVisible(true);
 }
 
 loadMessages().then(() => {
@@ -712,27 +1092,15 @@ loadMessages().then(() => {
 
 function connectSSE() {
   const es = new EventSource(API + "/events?t=" + TOKEN);
-
-  es.addEventListener("message", (e) => {
-    try { appendMessage(JSON.parse(e.data)); } catch {}
-  });
-
-  es.addEventListener("delete", (e) => {
-    try { removeMessage(JSON.parse(e.data).id); } catch {}
-  });
-
+  es.addEventListener("message", (e) => { try { appendMessage(JSON.parse(e.data)); } catch {} });
+  es.addEventListener("delete", (e) => { try { removeMessage(JSON.parse(e.data).id); } catch {} });
   es.addEventListener("presence", (e) => {
-    try {
-      const { online } = JSON.parse(e.data);
-      document.getElementById("onlineCount").textContent = online;
-    } catch {}
+    try { document.getElementById("onlineCount").textContent = JSON.parse(e.data).online; } catch {}
   });
-
-  es.onerror = () => {
-    es.close();
-    setTimeout(connectSSE, 2000);
-  };
+  es.onerror = () => { es.close(); setTimeout(connectSSE, 2000); };
 }
+
+} // end if (ROOM_ID && TOKEN)
 </script>
 </body>
 </html>
