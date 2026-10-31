@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { createReadStream, readFileSync, statSync } from "node:fs";
+import { createReadStream, readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
@@ -22,6 +22,12 @@ import {
   deleteMessage,
   stripPath,
   checkJoinRateLimit,
+  addSystemCommand,
+  addSystemResult,
+  updateCommandStatus,
+  getSystemMessages,
+  setSyncDir,
+  getSyncDir,
   type FileMessage,
 } from "./rooms.js";
 
@@ -45,7 +51,7 @@ function parseCookies(header: string | undefined): Map<string, string> {
   return map;
 }
 
-export function createApp(outputDir: string): Hono {
+export function createApp(outputDir: string, defaultSyncDir?: string): Hono {
   const app = new Hono();
 
   // --- CORS: only allow same-origin requests ---
@@ -107,6 +113,7 @@ export function createApp(outputDir: string): Hono {
       return c.json({ error: "nickname too long" }, 400);
     }
     const result = createRoom(body.name, body.password, body.nickname.trim());
+    if (defaultSyncDir) setSyncDir(result.id, defaultSyncDir);
     c.header("Set-Cookie", `ld_${result.id}=${result.token}; HttpOnly; SameSite=Strict; Path=/`);
     return c.json(result);
   });
@@ -340,6 +347,97 @@ export function createApp(outputDir: string): Hono {
       },
     });
   });
+
+  // --- System channel (commands / results) ---
+
+  app.get("/api/rooms/:id/system", (c) => {
+    const roomId = c.req.param("id");
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    return c.json({ messages: getSystemMessages(roomId) });
+  });
+
+  app.post("/api/rooms/:id/system/command", async (c) => {
+    const roomId = c.req.param("id");
+    const token = getToken(c, roomId);
+    if (!token) return c.json({ error: "unauthorized" }, 401);
+    const body = await c.req.json<{ run: string; target?: string; sync?: boolean }>();
+    if (typeof body.run !== "string" || !body.run.trim()) {
+      return c.json({ error: "expected { run: string }" }, 400);
+    }
+    const sender = getNickname(roomId, token);
+    const cmd = addSystemCommand(roomId, body.run, sender, body.target ?? null, body.sync ?? false);
+    if (!cmd) return c.json({ error: "room not found" }, 404);
+    broadcast(roomId, "system", cmd);
+    return c.json({ command: cmd });
+  });
+
+  app.post("/api/rooms/:id/system/result", async (c) => {
+    const roomId = c.req.param("id");
+    const token = getToken(c, roomId);
+    if (!token) return c.json({ error: "unauthorized" }, 401);
+    const body = await c.req.json<{
+      commandId: string;
+      exitCode: number | null;
+      stdout: string;
+      stderr: string;
+    }>();
+    if (!body.commandId) {
+      return c.json({ error: "expected { commandId: string }" }, 400);
+    }
+    const sender = getNickname(roomId, token);
+    const result = addSystemResult(
+      roomId, body.commandId, sender,
+      body.exitCode ?? null, body.stdout ?? "", body.stderr ?? "",
+    );
+    if (!result) return c.json({ error: "room not found" }, 404);
+    broadcast(roomId, "system", result);
+    return c.json({ result });
+  });
+
+  app.post("/api/rooms/:id/system/status", async (c) => {
+    const roomId = c.req.param("id");
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    const body = await c.req.json<{ commandId: string; status: string }>();
+    const valid = ["pending", "running", "done", "error", "denied"] as const;
+    if (!body.commandId || !valid.includes(body.status as typeof valid[number])) {
+      return c.json({ error: "invalid status" }, 400);
+    }
+    if (!updateCommandStatus(roomId, body.commandId, body.status as typeof valid[number])) {
+      return c.json({ error: "not found" }, 404);
+    }
+    broadcast(roomId, "system", { type: "status", commandId: body.commandId, status: body.status });
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/rooms/:id/sync-dir", async (c) => {
+    const roomId = c.req.param("id");
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    const body = await c.req.json<{ dir: string }>();
+    if (!body.dir?.trim()) return c.json({ error: "dir required" }, 400);
+    setSyncDir(roomId, body.dir);
+    return c.json({ ok: true });
+  });
+
+  app.get("/api/rooms/:id/sync-dir", (c) => {
+    const roomId = c.req.param("id");
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    return c.json({ dir: getSyncDir(roomId) });
+  });
+
+  app.get("/api/rooms/:id/sync-files", async (c) => {
+    const roomId = c.req.param("id");
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    const dir = getSyncDir(roomId);
+    if (!dir || !existsSync(dir)) {
+      return c.json({ error: "no sync dir configured" }, 404);
+    }
+    const { getChangedFiles, getFullTree } = await import("./sync.js");
+    const full = c.req.query("full") === "1";
+    const files = full ? getFullTree(dir) : getChangedFiles(dir);
+    return c.json({ files });
+  });
+
+  // --- Chat message deletion ---
 
   app.delete("/api/rooms/:id/messages/:msgId", (c) => {
     const roomId = c.req.param("id");

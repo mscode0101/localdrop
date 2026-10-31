@@ -7,58 +7,113 @@ import qrcode from "qrcode-terminal";
 import { getLanIp } from "./net.js";
 import { createApp } from "./server.js";
 
-function parseArgs(argv: string[]): { port: number; dir: string } {
-  let port = 7431;
-  let dir = resolve(homedir(), "Downloads", "LocalDrop");
+const argv = process.argv.slice(2);
+const subcommand = argv[0] === "listen" ? "listen" : "host";
 
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--port" || arg === "-p") {
-      const val = argv[++i];
-      if (val) port = parseInt(val, 10);
-    } else if (arg === "--dir" || arg === "-d") {
-      const val = argv[++i];
-      if (val) dir = resolve(val);
-    } else if (arg === "--help" || arg === "-h") {
-      console.log(`
+if (subcommand === "listen") {
+  runListen(argv.slice(1));
+} else {
+  runHost(argv);
+}
+
+function flag(args: string[], ...names: string[]): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    if (names.includes(args[i]) && args[i + 1]) return args[i + 1];
+  }
+  return undefined;
+}
+
+function hasFlag(args: string[], ...names: string[]): boolean {
+  return args.some((a) => names.includes(a));
+}
+
+function runHost(args: string[]): void {
+  if (hasFlag(args, "--help", "-h")) {
+    console.log(`
 localdrop [options]
 
 Share files and text between devices on the same network.
 Create password-protected rooms for group sharing.
 
 Options:
-  --port, -p <port>   Server port (default: 7431)
-  --dir,  -d <path>   Download directory (default: ~/Downloads/LocalDrop)
-  --help, -h          Show this help
+  --port,  -p <port>   Server port (default: 7431)
+  --dir,   -d <path>   Download directory (default: ~/Downloads/LocalDrop)
+  --sync,  -s <path>   Project directory to sync with listeners
+  --help,  -h          Show this help
+
+Subcommands:
+  listen               Connect to a host and listen for commands
 `);
-      process.exit(0);
-    }
+    process.exit(0);
   }
 
-  return { port, dir };
+  const port = parseInt(flag(args, "--port", "-p") ?? "7431", 10);
+  const dir = resolve(flag(args, "--dir", "-d") ?? resolve(homedir(), "Downloads", "LocalDrop"));
+  const syncDir = flag(args, "--sync", "-s");
+
+  const ip = getLanIp();
+  const url = `http://${ip}:${port}`;
+  const app = createApp(dir, syncDir ? resolve(syncDir) : undefined);
+
+  serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
+    console.log();
+    console.log("  LocalDrop is running");
+    console.log();
+    console.log(`  Saving files to: ${dir}`);
+    if (syncDir) console.log(`  Sync dir: ${resolve(syncDir)}`);
+    console.log();
+    console.log(`  ${url}`);
+    console.log();
+    qrcode.generate(url, { small: true }, (code: string) => {
+      for (const line of code.split("\n")) {
+        console.log("  " + line);
+      }
+      console.log();
+      console.log("  Open the URL or scan the QR code on any device.");
+      console.log("  Create a room to start sharing.");
+      if (syncDir) {
+        console.log(`  Sync enabled for: ${resolve(syncDir)}`);
+      }
+      console.log("  Press Ctrl+C to stop.\n");
+    });
+  });
+
 }
 
-const { port, dir } = parseArgs(process.argv.slice(2));
-const ip = getLanIp();
-const url = `http://${ip}:${port}`;
+async function runListen(args: string[]): Promise<void> {
+  if (hasFlag(args, "--help", "-h")) {
+    console.log(`
+localdrop listen [options]
 
-const app = createApp(dir);
+Connect to a LocalDrop host and listen for commands.
 
-serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
-  console.log();
-  console.log("  LocalDrop is running");
-  console.log();
-  console.log(`  Saving files to: ${dir}`);
-  console.log();
-  console.log(`  ${url}`);
-  console.log();
-  qrcode.generate(url, { small: true }, (code: string) => {
-    for (const line of code.split("\n")) {
-      console.log("  " + line);
-    }
-    console.log();
-    console.log("  Open the URL or scan the QR code on any device.");
-    console.log("  Create a room to start sharing.");
-    console.log("  Press Ctrl+C to stop.\n");
-  });
-});
+Options:
+  --host        <url>       Host URL (e.g. http://192.168.1.11:7431)
+  --room,    -r <id>        Room ID to join
+  --password,-p <pass>      Room password
+  --name,    -n <name>      This machine's name (required)
+  --allow       <cmd,...>   Comma-separated allowlist of commands
+  --timeout     <seconds>   Command timeout (default: 300)
+  --help,    -h             Show this help
+`);
+    process.exit(0);
+  }
+
+  const host = flag(args, "--host");
+  const roomId = flag(args, "--room", "-r");
+  const password = flag(args, "--password", "-p");
+  const name = flag(args, "--name", "-n");
+  const allowRaw = flag(args, "--allow");
+  const timeoutRaw = flag(args, "--timeout");
+
+  if (!host) { console.error("  --host is required"); process.exit(1); }
+  if (!roomId) { console.error("  --room is required"); process.exit(1); }
+  if (!password) { console.error("  --password is required"); process.exit(1); }
+  if (!name) { console.error("  --name is required"); process.exit(1); }
+
+  const allowlist = allowRaw ? allowRaw.split(",").map((s) => s.trim()) : [];
+  const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) * 1000 : undefined;
+
+  const { listen } = await import("./listen.js");
+  await listen({ host, roomId, password, name, allowlist, timeoutMs });
+}

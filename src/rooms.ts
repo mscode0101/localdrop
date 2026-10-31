@@ -20,6 +20,30 @@ export interface FileMessage {
 
 export type Message = TextMessage | FileMessage;
 
+export interface SystemCommand {
+  type: "command";
+  id: string;
+  target: string | null;
+  run: string;
+  sync: boolean;
+  sender: string;
+  status: "pending" | "running" | "done" | "error" | "denied";
+  timestamp: number;
+}
+
+export interface SystemResult {
+  type: "result";
+  id: string;
+  commandId: string;
+  sender: string;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  timestamp: number;
+}
+
+export type SystemMessage = SystemCommand | SystemResult;
+
 type SSEClient = {
   send: (event: string, data: string) => void;
   close: () => void;
@@ -38,6 +62,8 @@ interface Room {
   createdAt: number;
   tokens: Map<string, TokenInfo>;
   messages: Message[];
+  systemMessages: SystemMessage[];
+  syncDir: string | null;
   sseClients: Set<SSEClient>;
 }
 
@@ -82,6 +108,8 @@ export function createRoom(
     createdAt: Date.now(),
     tokens,
     messages: [],
+    systemMessages: [],
+    syncDir: null,
     sseClients: new Set(),
   });
   return { id, token };
@@ -221,4 +249,85 @@ export function deleteMessage(roomId: string, msgId: string): boolean {
   if (idx === -1) return false;
   room.messages.splice(idx, 1);
   return true;
+}
+
+export function addSystemCommand(
+  roomId: string,
+  run: string,
+  sender: string,
+  target: string | null,
+  sync: boolean,
+): SystemCommand | null {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  const cmd: SystemCommand = {
+    type: "command",
+    id: randomBytes(8).toString("hex"),
+    target,
+    run,
+    sync,
+    sender,
+    status: "pending",
+    timestamp: Date.now(),
+  };
+  room.systemMessages.push(cmd);
+  return cmd;
+}
+
+export function addSystemResult(
+  roomId: string,
+  commandId: string,
+  sender: string,
+  exitCode: number | null,
+  stdout: string,
+  stderr: string,
+): SystemResult | null {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  const cmd = room.systemMessages.find(
+    (m) => m.type === "command" && m.id === commandId,
+  ) as SystemCommand | undefined;
+  if (cmd) cmd.status = exitCode === 0 ? "done" : "error";
+  const result: SystemResult = {
+    type: "result",
+    id: randomBytes(8).toString("hex"),
+    commandId,
+    sender,
+    exitCode,
+    stdout,
+    stderr,
+    timestamp: Date.now(),
+  };
+  room.systemMessages.push(result);
+  return result;
+}
+
+export function updateCommandStatus(
+  roomId: string,
+  commandId: string,
+  status: SystemCommand["status"],
+): boolean {
+  const room = rooms.get(roomId);
+  if (!room) return false;
+  const cmd = room.systemMessages.find(
+    (m) => m.type === "command" && m.id === commandId,
+  ) as SystemCommand | undefined;
+  if (!cmd) return false;
+  cmd.status = status;
+  return true;
+}
+
+export function getSystemMessages(roomId: string): SystemMessage[] {
+  return rooms.get(roomId)?.systemMessages ?? [];
+}
+
+export function setSyncDir(roomId: string, dir: string): boolean {
+  const room = rooms.get(roomId);
+  if (!room) return false;
+  room.syncDir = dir;
+  return true;
+}
+
+export function getSyncDir(roomId: string): string | null {
+  return rooms.get(roomId)?.syncDir ?? null;
 }
