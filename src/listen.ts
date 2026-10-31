@@ -2,8 +2,9 @@ import { mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createInterface } from "node:readline";
-import { createSandboxConfig, isAllowed, execInSandbox, type SandboxConfig } from "./sandbox.js";
+import { createSandboxConfig, isAllowed, isBlocked, isJailBreak, execInSandbox, type SandboxConfig } from "./sandbox.js";
 import { applySync, type SyncFile } from "./sync.js";
+import { loadConfig, addToAllowlist, getConfigPath } from "./listener-config.js";
 
 interface ListenOptions {
   host: string;
@@ -12,6 +13,8 @@ interface ListenOptions {
   name: string;
   allowlist?: string[];
   timeoutMs?: number;
+  sandbox?: boolean;
+  noSandbox?: boolean;
 }
 
 function getMirrorDir(roomId: string): string {
@@ -89,7 +92,7 @@ async function promptUser(question: string): Promise<string> {
 }
 
 async function handleCommand(
-  cmd: { id: string; run: string; sync: boolean; target: string | null },
+  cmd: { id: string; run: string; sync: boolean; fullSync?: boolean; target: string | null },
   opts: ListenOptions,
   token: string,
   config: SandboxConfig,
@@ -98,6 +101,24 @@ async function handleCommand(
   if (cmd.target && cmd.target !== opts.name) return;
 
   console.log(`\n  Command received: ${cmd.run}`);
+
+  const blockedReason = isBlocked(cmd.run);
+  if (blockedReason) {
+    console.log(`  BLOCKED: ${blockedReason}`);
+    await postStatus(opts.host, opts.roomId, token, cmd.id, "denied");
+    await postResult(opts.host, opts.roomId, token, cmd.id, 1, "", `Blocked by sandbox: ${blockedReason}`);
+    return;
+  }
+
+  if (config.jailDir) {
+    const jailReason = isJailBreak(cmd.run, config.jailDir);
+    if (jailReason) {
+      console.log(`  JAIL BLOCKED: ${jailReason}`);
+      await postStatus(opts.host, opts.roomId, token, cmd.id, "denied");
+      await postResult(opts.host, opts.roomId, token, cmd.id, 1, "", `Sandbox: ${jailReason}`);
+      return;
+    }
+  }
 
   if (!isAllowed(cmd.run, config)) {
     console.log(`  Not in allowlist. Allow?`);
@@ -112,14 +133,16 @@ async function handleCommand(
     }
     if (answer === "a" || answer === "always") {
       config.allowlist.push(cmd.run);
-      console.log(`  Added "${cmd.run}" to allowlist.`);
+      addToAllowlist(cmd.run);
+      console.log(`  Added "${cmd.run}" to allowlist (saved to config).`);
     }
   }
 
   if (cmd.sync) {
     console.log("  Syncing files...");
     try {
-      const res = await fetch(`${opts.host}/api/rooms/${opts.roomId}/sync-files`, {
+      const syncUrl = `${opts.host}/api/rooms/${opts.roomId}/sync-files${cmd.fullSync ? "?full=1" : ""}`;
+      const res = await fetch(syncUrl, {
         headers: makeHeaders(opts.roomId, token),
       });
       if (res.ok) {
@@ -167,7 +190,7 @@ function connectSSE(
   host: string,
   roomId: string,
   token: string,
-  onCommand: (cmd: { id: string; run: string; sync: boolean; target: string | null }) => void,
+  onCommand: (cmd: { id: string; run: string; sync: boolean; fullSync?: boolean; target: string | null }) => void,
 ): void {
   const url = `${host}/api/rooms/${roomId}/events`;
 
@@ -223,9 +246,19 @@ function connectSSE(
 
 export async function listen(opts: ListenOptions): Promise<void> {
   const mirrorDir = getMirrorDir(opts.roomId);
+  const fileConfig = loadConfig();
+
+  const mergedAllowlist = [...new Set([
+    ...(opts.allowlist ?? []),
+    ...fileConfig.allowlist,
+  ])];
+  const useSandbox = opts.noSandbox === true ? false : (opts.sandbox ?? fileConfig.sandbox ?? true);
+  const timeoutMs = opts.timeoutMs ?? fileConfig.timeout * 1000;
+
   const config = createSandboxConfig({
-    allowlist: opts.allowlist ?? [],
-    timeoutMs: opts.timeoutMs,
+    allowlist: mergedAllowlist,
+    timeoutMs,
+    jailDir: useSandbox ? mirrorDir : null,
   });
 
   console.log();
@@ -241,12 +274,14 @@ export async function listen(opts: ListenOptions): Promise<void> {
 
   console.log(`  Connected to room ${opts.roomId} as "${opts.name}"`);
   console.log(`  Mirror dir: ${mirrorDir}`);
+  console.log(`  Config: ${getConfigPath()}`);
+  console.log(`  Sandbox: ${config.jailDir ? `ON (jail: ${config.jailDir})` : "OFF (unrestricted)"}`);
   console.log(`  Allowlist: ${config.allowlist.length === 0 ? "any command (open)" : config.allowlist.join(", ")}`);
   console.log(`  Timeout: ${Math.round(config.timeoutMs / 1000)}s`);
   console.log();
   console.log("  Listening for commands... (Ctrl+C to stop)");
 
-  const queue: Array<{ id: string; run: string; sync: boolean; target: string | null }> = [];
+  const queue: Array<{ id: string; run: string; sync: boolean; fullSync?: boolean; target: string | null }> = [];
   let processing = false;
 
   const processQueue = async () => {

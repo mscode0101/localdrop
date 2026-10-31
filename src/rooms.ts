@@ -1,4 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 
 export interface TextMessage {
   type: "text";
@@ -26,6 +29,7 @@ export interface SystemCommand {
   target: string | null;
   run: string;
   sync: boolean;
+  fullSync: boolean;
   sender: string;
   status: "pending" | "running" | "done" | "error" | "denied";
   timestamp: number;
@@ -75,6 +79,71 @@ function hash(pw: string, salt: string): string {
 
 const rooms = new Map<string, Room>();
 
+// --- Persistence ---
+const ROOMS_DIR = join(homedir(), ".localdrop", "rooms");
+mkdirSync(ROOMS_DIR, { recursive: true });
+
+const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+interface RoomData {
+  id: string;
+  name: string;
+  passwordHash: string;
+  salt: string;
+  createdAt: number;
+  tokens: Record<string, TokenInfo>;
+  messages: Message[];
+  systemMessages: SystemMessage[];
+  syncDir: string | null;
+}
+
+function saveRoom(roomId: string): void {
+  if (saveTimers.has(roomId)) clearTimeout(saveTimers.get(roomId)!);
+  saveTimers.set(roomId, setTimeout(() => {
+    saveTimers.delete(roomId);
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const data: RoomData = {
+      id: room.id,
+      name: room.name,
+      passwordHash: room.passwordHash,
+      salt: room.salt,
+      createdAt: room.createdAt,
+      tokens: Object.fromEntries(room.tokens),
+      messages: room.messages,
+      systemMessages: room.systemMessages,
+      syncDir: room.syncDir,
+    };
+    writeFileSync(join(ROOMS_DIR, roomId + ".json"), JSON.stringify(data), "utf-8");
+  }, 200));
+}
+
+function loadRoomsFromDisk(): void {
+  if (!existsSync(ROOMS_DIR)) return;
+  for (const file of readdirSync(ROOMS_DIR)) {
+    if (!file.endsWith(".json")) continue;
+    try {
+      const raw = readFileSync(join(ROOMS_DIR, file), "utf-8");
+      const data: RoomData = JSON.parse(raw);
+      const tokens = new Map<string, TokenInfo>(Object.entries(data.tokens));
+      rooms.set(data.id, {
+        id: data.id,
+        name: data.name,
+        passwordHash: data.passwordHash,
+        salt: data.salt,
+        createdAt: data.createdAt,
+        tokens,
+        messages: data.messages ?? [],
+        systemMessages: data.systemMessages ?? [],
+        syncDir: data.syncDir ?? null,
+        sseClients: new Set(),
+      });
+    } catch {}
+  }
+}
+
+loadRoomsFromDisk();
+
 const joinAttempts = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -112,6 +181,7 @@ export function createRoom(
     syncDir: null,
     sseClients: new Set(),
   });
+  saveRoom(id);
   return { id, token };
 }
 
@@ -134,6 +204,7 @@ export function joinRoom(id: string, password: string, nickname: string): string
   if (!room || room.passwordHash !== hash(password, room.salt)) return null;
   const token = randomBytes(16).toString("hex");
   room.tokens.set(token, { nickname, createdAt: Date.now() });
+  saveRoom(id);
   return token;
 }
 
@@ -206,6 +277,7 @@ export function addTextMessage(
     timestamp: Date.now(),
   };
   room.messages.push(msg);
+  saveRoom(roomId);
   return msg;
 }
 
@@ -228,6 +300,7 @@ export function addFileMessage(
     timestamp: Date.now(),
   };
   room.messages.push(msg);
+  saveRoom(roomId);
   return msg;
 }
 
@@ -248,6 +321,7 @@ export function deleteMessage(roomId: string, msgId: string): boolean {
   const idx = room.messages.findIndex((m) => m.id === msgId);
   if (idx === -1) return false;
   room.messages.splice(idx, 1);
+  saveRoom(roomId);
   return true;
 }
 
@@ -257,6 +331,7 @@ export function addSystemCommand(
   sender: string,
   target: string | null,
   sync: boolean,
+  fullSync: boolean = false,
 ): SystemCommand | null {
   const room = rooms.get(roomId);
   if (!room) return null;
@@ -266,11 +341,13 @@ export function addSystemCommand(
     target,
     run,
     sync,
+    fullSync,
     sender,
     status: "pending",
     timestamp: Date.now(),
   };
   room.systemMessages.push(cmd);
+  saveRoom(roomId);
   return cmd;
 }
 
@@ -299,6 +376,7 @@ export function addSystemResult(
     timestamp: Date.now(),
   };
   room.systemMessages.push(result);
+  saveRoom(roomId);
   return result;
 }
 
@@ -314,6 +392,7 @@ export function updateCommandStatus(
   ) as SystemCommand | undefined;
   if (!cmd) return false;
   cmd.status = status;
+  saveRoom(roomId);
   return true;
 }
 
@@ -325,6 +404,7 @@ export function setSyncDir(roomId: string, dir: string): boolean {
   const room = rooms.get(roomId);
   if (!room) return false;
   room.syncDir = dir;
+  saveRoom(roomId);
   return true;
 }
 

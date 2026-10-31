@@ -2,12 +2,24 @@
 
 import { resolve } from "node:path";
 import { homedir } from "node:os";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { serve } from "@hono/node-server";
 import qrcode from "qrcode-terminal";
 import { getLanIp } from "./net.js";
 import { createApp } from "./server.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
+
 const argv = process.argv.slice(2);
+
+if (argv.includes("--version") || argv.includes("-v")) {
+  console.log(pkg.version);
+  process.exit(0);
+}
+
 const subcommand = argv[0] === "listen" ? "listen" : "host";
 
 if (subcommand === "listen") {
@@ -94,6 +106,7 @@ Options:
   --name,    -n <name>      This machine's name (required)
   --allow       <cmd,...>   Comma-separated allowlist of commands
   --timeout     <seconds>   Command timeout (default: 300)
+  --full-access             Disable sandbox (full filesystem access)
   --help,    -h             Show this help
 `);
     process.exit(0);
@@ -105,6 +118,7 @@ Options:
   const name = flag(args, "--name", "-n");
   const allowRaw = flag(args, "--allow");
   const timeoutRaw = flag(args, "--timeout");
+  const noSandbox = hasFlag(args, "--full-access");
 
   if (!host) { console.error("  --host is required"); process.exit(1); }
   if (!roomId) { console.error("  --room is required"); process.exit(1); }
@@ -115,5 +129,5 @@ Options:
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) * 1000 : undefined;
 
   const { listen } = await import("./listen.js");
-  await listen({ host, roomId, password, name, allowlist, timeoutMs });
+  await listen({ host, roomId, password, name, allowlist, timeoutMs, noSandbox });
 }

@@ -360,12 +360,12 @@ export function createApp(outputDir: string, defaultSyncDir?: string): Hono {
     const roomId = c.req.param("id");
     const token = getToken(c, roomId);
     if (!token) return c.json({ error: "unauthorized" }, 401);
-    const body = await c.req.json<{ run: string; target?: string; sync?: boolean }>();
+    const body = await c.req.json<{ run: string; target?: string; sync?: boolean; fullSync?: boolean }>();
     if (typeof body.run !== "string" || !body.run.trim()) {
       return c.json({ error: "expected { run: string }" }, 400);
     }
     const sender = getNickname(roomId, token);
-    const cmd = addSystemCommand(roomId, body.run, sender, body.target ?? null, body.sync ?? false);
+    const cmd = addSystemCommand(roomId, body.run, sender, body.target ?? null, body.sync ?? false, body.fullSync ?? false);
     if (!cmd) return c.json({ error: "room not found" }, 404);
     broadcast(roomId, "system", cmd);
     return c.json({ command: cmd });
