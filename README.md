@@ -22,7 +22,7 @@ LocalDrop turns your local network into a private sharing hub. Create password-p
 Think AirDrop, but for **every device on your network** — phones, laptops, desktops, servers.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mscode0101/localdrop/feat/agent-orchestration/assets/landing.jpg" width="600" alt="LocalDrop room list">
+  <img src="https://raw.githubusercontent.com/mscode0101/localdrop/main/assets/landing.jpg" width="600" alt="LocalDrop room list">
 </p>
 
 ## Quick Start
@@ -41,7 +41,7 @@ That's it. A server starts, prints a URL and QR code. Open it on any device.
 Create password-protected rooms for groups, projects, or quick transfers. Everyone in the room sees shared files and messages in real-time.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mscode0101/localdrop/feat/agent-orchestration/assets/chat-tab.jpg" width="600" alt="Chat tab — real-time messaging">
+  <img src="https://raw.githubusercontent.com/mscode0101/localdrop/main/assets/chat-tab.jpg" width="600" alt="Chat tab — real-time messaging">
 </p>
 
 - **Text messages** — group chat within the room
@@ -62,7 +62,7 @@ localdrop listen \
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mscode0101/localdrop/feat/agent-orchestration/assets/system-tab.jpg" width="600" alt="System tab — remote command execution">
+  <img src="https://raw.githubusercontent.com/mscode0101/localdrop/main/assets/system-tab.jpg" width="600" alt="System tab — remote command execution">
 </p>
 
 Commands show live status (pending / running / done / error) with full stdout/stderr output. Use it for:
