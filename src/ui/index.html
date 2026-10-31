@@ -51,14 +51,34 @@
 
   /* ===== Sidebar ===== */
   .sidebar-header {
-    padding: 20px 16px 16px;
-    text-align: center;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
+  .sidebar-header-text { flex: 1; }
   .sidebar-header h1 { font-size: 20px; font-weight: 700; }
   .sidebar-header h1 span { color: var(--accent); }
-  .sidebar-header p { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+  .sidebar-header p { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  .btn-refresh {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s, transform 0.4s;
+  }
+  .btn-refresh:hover { background: #333; color: var(--text); }
+  .btn-refresh.spinning { transform: rotate(360deg); }
 
   .room-list {
     flex: 1;
@@ -578,8 +598,13 @@
   <!-- Sidebar: room list -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <h1><span>Local</span>Drop</h1>
-      <p>Rooms on your network</p>
+      <div class="sidebar-header-text">
+        <h1><span>Local</span>Drop</h1>
+        <p>Rooms on your network</p>
+      </div>
+      <button class="btn-refresh" id="refreshBtn" title="Refresh rooms">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
     </div>
     <div class="room-list" id="rooms">
       <div class="rooms-empty" id="roomsEmpty">No rooms yet.<br>Create one to start sharing.</div>
@@ -855,24 +880,26 @@ document.getElementById("joinModal").addEventListener("click", (e) => {
   if (e.target === e.currentTarget) document.getElementById("joinCancel").click();
 });
 
-let lastRoomsJSON = "";
-
 async function loadRooms() {
   try {
     const res = await fetch("/api/rooms");
     const data = await res.json();
-    const json = JSON.stringify(data.rooms);
-    if (json !== lastRoomsJSON) {
-      lastRoomsJSON = json;
-      renderRooms(data.rooms);
-    }
+    renderRooms(data.rooms);
   } catch (e) {
     console.error("Failed to load rooms", e);
   }
 }
 
 loadRooms();
-setInterval(loadRooms, 3000);
+
+document.getElementById("refreshBtn").addEventListener("click", () => {
+  const btn = document.getElementById("refreshBtn");
+  btn.classList.remove("spinning");
+  void btn.offsetWidth;
+  btn.classList.add("spinning");
+  loadRooms();
+  setTimeout(() => btn.classList.remove("spinning"), 400);
+});
 
 // ===== Chat functionality (only when in a room) =====
 if (ROOM_ID && TOKEN) {
