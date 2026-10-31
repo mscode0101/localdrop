@@ -55,7 +55,7 @@ The killer feature. Connect a machine as a **listener** and run shell commands o
 ```bash
 # On the remote machine
 localdrop listen \
-  --host http://192.168.1.11:7431 \
+  --host http://192.168.x.x:7431 \
   --room abc123 \
   --password secret \
   --name my-mac
@@ -139,7 +139,7 @@ localdrop listen [options]
 
 | Option | Description |
 |--------|-------------|
-| `--host <url>` | Host URL (e.g. `http://192.168.1.11:7431`) |
+| `--host <url>` | Host URL (e.g. `http://192.168.x.x:7431`) |
 | `--room, -r <id>` | Room ID to join |
 | `--password, -p <pass>` | Room password |
 | `--name, -n <name>` | This machine's name |
