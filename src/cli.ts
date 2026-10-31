@@ -1,20 +1,13 @@
 #!/usr/bin/env node
 
-import { existsSync, statSync } from "node:fs";
-import { resolve, basename } from "node:path";
+import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { serve } from "@hono/node-server";
 import qrcode from "qrcode-terminal";
-import { getLanIp, generateToken } from "./net.js";
-import { initHistory, addFileMessage } from "./history.js";
+import { getLanIp } from "./net.js";
 import { createApp } from "./server.js";
 
-function parseArgs(argv: string[]): {
-  files: string[];
-  port: number;
-  dir: string;
-} {
-  const files: string[] = [];
+function parseArgs(argv: string[]): { port: number; dir: string } {
   let port = 7431;
   let dir = resolve(homedir(), "Downloads", "LocalDrop");
 
@@ -28,9 +21,10 @@ function parseArgs(argv: string[]): {
       if (val) dir = resolve(val);
     } else if (arg === "--help" || arg === "-h") {
       console.log(`
-localdrop [files...] [options]
+localdrop [options]
 
-Share files between devices on the same network.
+Share files and text between devices on the same network.
+Create password-protected rooms for group sharing.
 
 Options:
   --port, -p <port>   Server port (default: 7431)
@@ -38,55 +32,33 @@ Options:
   --help, -h          Show this help
 `);
       process.exit(0);
-    } else if (!arg.startsWith("-")) {
-      files.push(resolve(arg));
     }
   }
 
-  return { files, port, dir };
+  return { port, dir };
 }
 
-const { files, port, dir } = parseArgs(process.argv.slice(2));
-
-for (const f of files) {
-  if (!existsSync(f)) {
-    console.error(`File not found: ${f}`);
-    process.exit(1);
-  }
-}
-
-const historyFile = resolve(homedir(), ".localdrop", "history.jsonl");
-await initHistory(historyFile);
-
-for (const f of files) {
-  const name = basename(f);
-  const size = statSync(f).size;
-  addFileMessage(name, f, size);
-}
-
-const token = generateToken();
+const { port, dir } = parseArgs(process.argv.slice(2));
 const ip = getLanIp();
-const url = `http://${ip}:${port}/?t=${token}`;
+const url = `http://${ip}:${port}`;
 
-const app = createApp(token, dir);
+const app = createApp(dir);
 
 serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, () => {
   console.log();
   console.log("  LocalDrop is running");
   console.log();
-  if (files.length > 0) {
-    console.log(`  Sharing ${files.length} file(s)`);
-  }
-  console.log(`  Receiving to: ${dir}`);
+  console.log(`  Saving files to: ${dir}`);
   console.log();
-  console.log(url);
+  console.log(`  ${url}`);
   console.log();
   qrcode.generate(url, { small: true }, (code: string) => {
     for (const line of code.split("\n")) {
       console.log("  " + line);
     }
     console.log();
-    console.log("  Scan the QR code or open the URL on your phone.");
+    console.log("  Open the URL or scan the QR code on any device.");
+    console.log("  Create a room to start sharing.");
     console.log("  Press Ctrl+C to stop.\n");
   });
 });

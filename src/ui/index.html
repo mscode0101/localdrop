@@ -36,16 +36,52 @@
 
   .header {
     padding: 12px 16px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 12px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
     flex-shrink: 0;
   }
-  .header h1 {
-    font-size: 18px;
-    font-weight: 700;
+
+  .btn-back {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: var(--border);
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
   }
-  .header h1 span { color: var(--accent); }
+  .btn-back:hover { background: #333; }
+
+  .header-info { flex: 1; min-width: 0; }
+  .header-name {
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .header-status {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+  }
 
   .chat {
     flex: 1;
@@ -335,12 +371,18 @@
 <body>
 
 <div class="header">
-  <h1><span>Local</span>Drop</h1>
+  <button class="btn-back" id="backBtn" title="Leave room">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <div class="header-info">
+    <div class="header-name" id="roomName">__ROOM_NAME__</div>
+    <div class="header-status"><span class="dot"></span><span id="onlineCount">0</span> online</div>
+  </div>
 </div>
 
 <div class="chat" id="chat">
   <div class="chat-empty" id="chatEmpty">
-    Send text or files to share<br>between your devices
+    Send text or files to share<br>with everyone in this room
   </div>
 </div>
 
@@ -358,8 +400,14 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const TOKEN = "__TOKEN__";
+const ROOM_ID = window.location.pathname.split("/")[2];
+const TOKEN = new URLSearchParams(window.location.search).get("t");
+const API = "/api/rooms/" + ROOM_ID;
 const headers = { "X-Token": TOKEN };
+
+if (!TOKEN || !ROOM_ID) {
+  window.location.href = "/";
+}
 
 const SVG_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
 const SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -433,31 +481,14 @@ function renderMessage(msg) {
 
   let content = "";
   if (msg.type === "text") {
-    content = `<div class="msg-text${isLong ? " clamped" : ""}">${esc(msg.text)}</div>${isLong ? '<button class="btn-more">Show more</button>' : ""}`;
+    content = '<div class="msg-text' + (isLong ? " clamped" : "") + '">' + esc(msg.text) + "</div>" + (isLong ? '<button class="btn-more">Show more</button>' : "");
   } else {
-    content = `
-      <div class="msg-file">
-        <div class="msg-file-icon">${SVG_FILE}</div>
-        <div class="msg-file-info">
-          <div class="msg-file-name">${esc(msg.name)}</div>
-          <div class="msg-file-size">${formatSize(msg.size)}</div>
-        </div>
-        <a class="btn-dl" href="/api/download/${msg.id}?t=${TOKEN}" download="${esc(msg.name)}">${SVG_DL} Save</a>
-      </div>`;
+    content = '<div class="msg-file"><div class="msg-file-icon">' + SVG_FILE + '</div><div class="msg-file-info"><div class="msg-file-name">' + esc(msg.name) + '</div><div class="msg-file-size">' + formatSize(msg.size) + '</div></div><a class="btn-dl" href="' + API + "/download/" + msg.id + "?t=" + TOKEN + '" download="' + esc(msg.name) + '">' + SVG_DL + " Save</a></div>";
   }
 
   const copyData = msg.type === "text" ? msg.text : msg.name;
 
-  div.innerHTML = `
-    ${content}
-    <div class="msg-footer">
-      <span class="msg-time">${formatTime(msg.timestamp)}</span>
-      <div class="msg-actions">
-        <button class="btn-icon btn-copy" title="Copy">${SVG_COPY}</button>
-        <button class="btn-icon btn-del" title="Delete">${SVG_TRASH}</button>
-      </div>
-    </div>
-  `;
+  div.innerHTML = content + '<div class="msg-footer"><span class="msg-time">' + formatTime(msg.timestamp) + '</span><div class="msg-actions"><button class="btn-icon btn-copy" title="Copy">' + SVG_COPY + '</button><button class="btn-icon btn-del" title="Delete">' + SVG_TRASH + "</button></div></div>";
 
   div.querySelector(".btn-copy").addEventListener("click", function() { copyText(copyData, this); });
   div.querySelector(".btn-del").addEventListener("click", () => deleteMsg(msg.id));
@@ -493,13 +524,13 @@ function setEmptyVisible(visible) {
 }
 
 function clearRenderedMessages() {
-  // Remove only messages and separators, never the #chatEmpty element
   document.querySelectorAll("#chat .msg, #chat .day-sep").forEach((n) => n.remove());
 }
 
 async function loadMessages() {
   try {
-    const res = await fetch("/api/messages?t=" + TOKEN);
+    const res = await fetch(API + "/messages?t=" + TOKEN);
+    if (res.status === 401) { window.location.href = "/"; return; }
     const data = await res.json();
     const chat = document.getElementById("chat");
 
@@ -532,11 +563,12 @@ async function sendText() {
   const btn = document.getElementById("sendBtn");
   btn.disabled = true;
   try {
-    const res = await fetch("/api/messages/text?t=" + TOKEN, {
+    const res = await fetch(API + "/messages/text?t=" + TOKEN, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
+    if (res.status === 401) { window.location.href = "/"; return; }
     if (res.ok) {
       input.value = "";
       input.style.height = "auto";
@@ -556,11 +588,7 @@ function uploadFiles(fileList) {
   for (const file of fileList) {
     const item = document.createElement("div");
     item.className = "progress-item";
-    item.innerHTML = `
-      <span class="progress-item-name">${esc(file.name)}</span>
-      <div class="progress-item-bar"><div class="progress-item-fill"></div></div>
-      <span class="progress-item-pct">0%</span>
-    `;
+    item.innerHTML = '<span class="progress-item-name">' + esc(file.name) + '</span><div class="progress-item-bar"><div class="progress-item-fill"></div></div><span class="progress-item-pct">0%</span>';
     progress.appendChild(item);
 
     const fill = item.querySelector(".progress-item-fill");
@@ -570,7 +598,7 @@ function uploadFiles(fileList) {
     form.append("file", file);
 
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/messages/file?t=" + TOKEN);
+    xhr.open("POST", API + "/messages/file?t=" + TOKEN);
     xhr.setRequestHeader("X-Token", TOKEN);
 
     xhr.upload.addEventListener("progress", (e) => {
@@ -589,6 +617,8 @@ function uploadFiles(fileList) {
         pct.classList.add("done");
         showToast(file.name + " sent");
         setTimeout(() => item.remove(), 2000);
+      } else if (xhr.status === 401) {
+        window.location.href = "/";
       } else {
         fill.classList.add("error");
         pct.textContent = "Error";
@@ -608,13 +638,17 @@ function uploadFiles(fileList) {
 
 async function deleteMsg(id) {
   try {
-    await fetch("/api/messages/" + id + "?t=" + TOKEN, { method: "DELETE", headers });
-    // Optimistic local removal; SSE 'delete' event also calls removeMessage (idempotent)
+    await fetch(API + "/messages/" + id + "?t=" + TOKEN, { method: "DELETE", headers });
     removeMessage(id);
   } catch (e) {
     console.error("Delete failed", e);
   }
 }
+
+// Back button
+document.getElementById("backBtn").addEventListener("click", () => {
+  window.location.href = "/";
+});
 
 // Compose handlers
 const textInput = document.getElementById("textInput");
@@ -640,7 +674,6 @@ fileInput.addEventListener("change", () => {
   fileInput.value = "";
 });
 
-// Drag-drop on the whole chat area
 const chat = document.getElementById("chat");
 chat.addEventListener("dragover", (e) => { e.preventDefault(); });
 chat.addEventListener("drop", (e) => {
@@ -648,7 +681,6 @@ chat.addEventListener("drop", (e) => {
   uploadFiles(e.dataTransfer.files);
 });
 
-// Track message IDs to avoid duplicates from SSE race
 const knownIds = new Set();
 
 function appendMessage(msg) {
@@ -666,34 +698,33 @@ function appendMessage(msg) {
 
 function removeMessage(id) {
   knownIds.delete(id);
-  const el = document.querySelector(`.msg[data-id="${id}"]`);
+  const el = document.querySelector('.msg[data-id="' + id + '"]');
   if (el) el.remove();
   if (!document.querySelector("#chat .msg")) {
     setEmptyVisible(true);
   }
 }
 
-// Load initial messages, then connect SSE for live updates
 loadMessages().then(() => {
-  // Populate knownIds from what loadMessages rendered
-  document.querySelectorAll(".msg[data-id]").forEach(el => knownIds.add(el.dataset.id));
+  document.querySelectorAll(".msg[data-id]").forEach((el) => knownIds.add(el.dataset.id));
   connectSSE();
 });
 
 function connectSSE() {
-  const es = new EventSource("/api/events?t=" + TOKEN);
+  const es = new EventSource(API + "/events?t=" + TOKEN);
 
   es.addEventListener("message", (e) => {
-    try {
-      const msg = JSON.parse(e.data);
-      appendMessage(msg);
-    } catch {}
+    try { appendMessage(JSON.parse(e.data)); } catch {}
   });
 
   es.addEventListener("delete", (e) => {
+    try { removeMessage(JSON.parse(e.data).id); } catch {}
+  });
+
+  es.addEventListener("presence", (e) => {
     try {
-      const { id } = JSON.parse(e.data);
-      removeMessage(id);
+      const { online } = JSON.parse(e.data);
+      document.getElementById("onlineCount").textContent = online;
     } catch {}
   });
 

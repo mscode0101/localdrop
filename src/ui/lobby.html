@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>LocalDrop</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #151515;
+    --bubble: #1c1c1e;
+    --border: #2a2a2a;
+    --text: #e5e5e5;
+    --text-dim: #777;
+    --accent: #4f9eff;
+    --accent-hover: #6fb3ff;
+    --success: #34d399;
+    --danger: #f87171;
+    --radius: 12px;
+  }
+
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .header {
+    padding: 20px 16px 16px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header h1 span { color: var(--accent); }
+  .header p { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+
+  .rooms {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rooms-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 14px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .room-card {
+    background: var(--bubble);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: fadeIn 0.15s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .room-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), #7c5cff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .room-info { flex: 1; min-width: 0; }
+  .room-name {
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .room-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+  }
+
+  .btn-join {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .btn-join:hover { background: var(--accent-hover); }
+
+  .footer {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .btn-create {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-create:hover { background: var(--accent-hover); }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 360px;
+    animation: fadeIn 0.15s ease;
+  }
+  .modal h2 {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .modal label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+  .modal label:first-of-type { margin-top: 0; }
+  .modal input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-error {
+    color: var(--danger);
+    font-size: 12px;
+    margin-top: 8px;
+    display: none;
+  }
+  .modal-btns {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .modal-btns button {
+    flex: 1;
+    padding: 11px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-cancel {
+    background: var(--border);
+    color: var(--text);
+  }
+  .btn-cancel:hover { background: #333; }
+  .btn-confirm {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-confirm:hover { background: var(--accent-hover); }
+  .btn-confirm:disabled { opacity: 0.5; cursor: default; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>Local</span>Drop</h1>
+  <p>Rooms on your network</p>
+</div>
+
+<div class="rooms" id="rooms">
+  <div class="rooms-empty" id="roomsEmpty">
+    No rooms yet.<br>Create one to start sharing.
+  </div>
+</div>
+
+<div class="footer">
+  <button class="btn-create" id="createBtn">+ Create Room</button>
+</div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <h2>Create a Room</h2>
+    <label for="createName">Room name</label>
+    <input type="text" id="createName" placeholder="e.g. Design Team" maxlength="50" autocomplete="off">
+    <label for="createPass">Password</label>
+    <input type="password" id="createPass" placeholder="Set a password" autocomplete="off">
+    <div class="modal-error" id="createError"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="createCancel">Cancel</button>
+      <button class="btn-confirm" id="createConfirm">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="joinModal">
+  <div class="modal">
+    <h2 id="joinTitle">Join Room</h2>
+    <label for="joinPass">Password</label>
+    <input type="password" id="joinPass" placeholder="Enter room password" autocomplete="off">
+    <div class="modal-error" id="joinError"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="joinCancel">Cancel</button>
+      <button class="btn-confirm" id="joinConfirm">Join</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SVG_LOCK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+let joinRoomId = null;
+
+function renderRooms(rooms) {
+  const container = document.getElementById("rooms");
+  const empty = document.getElementById("roomsEmpty");
+  container.querySelectorAll(".room-card").forEach((n) => n.remove());
+
+  if (!rooms || rooms.length === 0) {
+    empty.style.display = "";
+    return;
+  }
+  empty.style.display = "none";
+
+  for (const room of rooms) {
+    const card = document.createElement("div");
+    card.className = "room-card";
+    card.innerHTML = `
+      <div class="room-icon">${SVG_LOCK}</div>
+      <div class="room-info">
+        <div class="room-name">${esc(room.name)}</div>
+        <div class="room-meta"><span class="dot"></span>${room.online} online</div>
+      </div>
+      <button class="btn-join">Join</button>
+    `;
+    const btn = card.querySelector(".btn-join");
+    btn.addEventListener("click", () => {
+      joinRoomId = room.id;
+      document.getElementById("joinTitle").textContent = 'Join "' + room.name + '"';
+      document.getElementById("joinPass").value = "";
+      document.getElementById("joinError").style.display = "none";
+      document.getElementById("joinModal").classList.add("show");
+      document.getElementById("joinPass").focus();
+    });
+    container.appendChild(card);
+  }
+}
+
+async function loadRooms() {
+  try {
+    const res = await fetch("/api/rooms");
+    const data = await res.json();
+    renderRooms(data.rooms);
+  } catch (e) {
+    console.error("Failed to load rooms", e);
+  }
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.display = "block";
+}
+
+// Create room
+document.getElementById("createBtn").addEventListener("click", () => {
+  document.getElementById("createName").value = "";
+  document.getElementById("createPass").value = "";
+  document.getElementById("createError").style.display = "none";
+  document.getElementById("createModal").classList.add("show");
+  document.getElementById("createName").focus();
+});
+
+document.getElementById("createCancel").addEventListener("click", () => {
+  document.getElementById("createModal").classList.remove("show");
+});
+
+document.getElementById("createConfirm").addEventListener("click", async () => {
+  const name = document.getElementById("createName").value.trim();
+  const password = document.getElementById("createPass").value;
+  if (!name) { showError("createError", "Room name is required"); return; }
+  if (!password) { showError("createError", "Password is required"); return; }
+
+  const btn = document.getElementById("createConfirm");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, password }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      window.location.href = "/room/" + data.id + "?t=" + data.token;
+    } else {
+      showError("createError", data.error || "Failed to create room");
+    }
+  } catch {
+    showError("createError", "Connection failed");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Join room
+document.getElementById("joinCancel").addEventListener("click", () => {
+  document.getElementById("joinModal").classList.remove("show");
+  joinRoomId = null;
+});
+
+document.getElementById("joinConfirm").addEventListener("click", async () => {
+  const password = document.getElementById("joinPass").value;
+  if (!password) { showError("joinError", "Password is required"); return; }
+
+  const btn = document.getElementById("joinConfirm");
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/rooms/" + joinRoomId + "/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      window.location.href = "/room/" + joinRoomId + "?t=" + data.token;
+    } else {
+      showError("joinError", "Wrong password");
+    }
+  } catch {
+    showError("joinError", "Connection failed");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Keyboard shortcuts
+document.getElementById("createName").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("createPass").focus();
+});
+document.getElementById("createPass").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("createConfirm").click();
+});
+document.getElementById("joinPass").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("joinConfirm").click();
+});
+
+// Close modals on overlay click
+document.getElementById("createModal").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) document.getElementById("createCancel").click();
+});
+document.getElementById("joinModal").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) document.getElementById("joinCancel").click();
+});
+
+loadRooms();
+setInterval(loadRooms, 3000);
+</script>
+</body>
+</html>
