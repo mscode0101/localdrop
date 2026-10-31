@@ -4,6 +4,7 @@ export interface TextMessage {
   type: "text";
   id: string;
   text: string;
+  sender: string;
   timestamp: number;
 }
 
@@ -13,6 +14,7 @@ export interface FileMessage {
   name: string;
   path: string;
   size: number;
+  sender: string;
   timestamp: number;
 }
 
@@ -23,34 +25,62 @@ type SSEClient = {
   close: () => void;
 };
 
+interface TokenInfo {
+  nickname: string;
+  createdAt: number;
+}
+
 interface Room {
   id: string;
   name: string;
   passwordHash: string;
+  salt: string;
   createdAt: number;
-  tokens: Set<string>;
+  tokens: Map<string, TokenInfo>;
   messages: Message[];
   sseClients: Set<SSEClient>;
 }
 
-function hash(pw: string): string {
-  return createHash("sha256").update(pw).digest("hex");
+const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function hash(pw: string, salt: string): string {
+  return createHash("sha256").update(salt + pw).digest("hex");
 }
 
 const rooms = new Map<string, Room>();
 
+const joinAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+export function checkJoinRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = joinAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    joinAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT_MAX;
+}
+
 export function createRoom(
   name: string,
   password: string,
+  nickname: string,
 ): { id: string; token: string } {
   const id = randomBytes(4).toString("hex");
   const token = randomBytes(16).toString("hex");
+  const salt = randomBytes(16).toString("hex");
+  const tokens = new Map<string, TokenInfo>();
+  tokens.set(token, { nickname, createdAt: Date.now() });
   rooms.set(id, {
     id,
     name: name.trim(),
-    passwordHash: hash(password),
+    passwordHash: hash(password, salt),
+    salt,
     createdAt: Date.now(),
-    tokens: new Set([token]),
+    tokens,
     messages: [],
     sseClients: new Set(),
   });
@@ -71,16 +101,28 @@ export function listRooms(): Array<{
   }));
 }
 
-export function joinRoom(id: string, password: string): string | null {
+export function joinRoom(id: string, password: string, nickname: string): string | null {
   const room = rooms.get(id);
-  if (!room || room.passwordHash !== hash(password)) return null;
+  if (!room || room.passwordHash !== hash(password, room.salt)) return null;
   const token = randomBytes(16).toString("hex");
-  room.tokens.add(token);
+  room.tokens.set(token, { nickname, createdAt: Date.now() });
   return token;
 }
 
 export function validateToken(roomId: string, token: string): boolean {
-  return rooms.get(roomId)?.tokens.has(token) ?? false;
+  const room = rooms.get(roomId);
+  if (!room) return false;
+  const info = room.tokens.get(token);
+  if (!info) return false;
+  if (Date.now() - info.createdAt > TOKEN_MAX_AGE_MS) {
+    room.tokens.delete(token);
+    return false;
+  }
+  return true;
+}
+
+export function getNickname(roomId: string, token: string): string {
+  return rooms.get(roomId)?.tokens.get(token)?.nickname ?? "Anonymous";
 }
 
 export function getRoomName(roomId: string): string | undefined {
@@ -124,6 +166,7 @@ export function stripPath(
 export function addTextMessage(
   roomId: string,
   text: string,
+  sender: string,
 ): TextMessage | null {
   const room = rooms.get(roomId);
   if (!room) return null;
@@ -131,6 +174,7 @@ export function addTextMessage(
     type: "text",
     id: randomBytes(8).toString("hex"),
     text,
+    sender,
     timestamp: Date.now(),
   };
   room.messages.push(msg);
@@ -142,6 +186,7 @@ export function addFileMessage(
   name: string,
   path: string,
   size: number,
+  sender: string,
 ): FileMessage | null {
   const room = rooms.get(roomId);
   if (!room) return null;
@@ -151,6 +196,7 @@ export function addFileMessage(
     name,
     path,
     size,
+    sender,
     timestamp: Date.now(),
   };
   room.messages.push(msg);

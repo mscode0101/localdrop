@@ -10,6 +10,7 @@ import {
   listRooms,
   joinRoom,
   validateToken,
+  getNickname,
   getRoomName,
   addSSEClient,
   removeSSEClient,
@@ -20,6 +21,7 @@ import {
   getMessage,
   deleteMessage,
   stripPath,
+  checkJoinRateLimit,
   type FileMessage,
 } from "./rooms.js";
 
@@ -33,8 +35,38 @@ function readUI(filename: string): string {
   }
 }
 
+function parseCookies(header: string | undefined): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!header) return map;
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq > 0) map.set(part.slice(0, eq).trim(), part.slice(eq + 1).trim());
+  }
+  return map;
+}
+
 export function createApp(outputDir: string): Hono {
   const app = new Hono();
+
+  // --- CORS: only allow same-origin requests ---
+  app.use("/api/*", async (c, next) => {
+    const origin = c.req.header("origin");
+    if (origin) {
+      const host = c.req.header("host");
+      const allowed = host ? `http://${host}` : null;
+      if (origin !== allowed) {
+        return c.json({ error: "CORS rejected" }, 403);
+      }
+      c.header("Access-Control-Allow-Origin", origin);
+      c.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+      c.header("Access-Control-Allow-Headers", "Content-Type");
+      c.header("Access-Control-Allow-Credentials", "true");
+    }
+    if (c.req.method === "OPTIONS") {
+      return new Response(null, { status: 204 });
+    }
+    await next();
+  });
 
   // --- Pages ---
 
@@ -61,42 +93,65 @@ export function createApp(outputDir: string): Hono {
   app.get("/api/rooms", (c) => c.json({ rooms: listRooms() }));
 
   app.post("/api/rooms", async (c) => {
-    const body = await c.req.json<{ name: string; password: string }>();
+    const body = await c.req.json<{ name: string; password: string; nickname: string }>();
     if (!body.name?.trim() || !body.password) {
       return c.json({ error: "name and password required" }, 400);
+    }
+    if (!body.nickname?.trim()) {
+      return c.json({ error: "nickname required" }, 400);
     }
     if (body.name.trim().length > 50) {
       return c.json({ error: "name too long" }, 400);
     }
-    const result = createRoom(body.name, body.password);
+    if (body.nickname.trim().length > 30) {
+      return c.json({ error: "nickname too long" }, 400);
+    }
+    const result = createRoom(body.name, body.password, body.nickname.trim());
+    c.header("Set-Cookie", `ld_${result.id}=${result.token}; HttpOnly; SameSite=Strict; Path=/`);
     return c.json(result);
   });
 
   app.post("/api/rooms/:id/join", async (c) => {
-    const body = await c.req.json<{ password: string }>();
+    const ip = c.req.header("x-forwarded-for") ?? "unknown";
+    if (!checkJoinRateLimit(ip)) {
+      return c.json({ error: "too many attempts, try again in a minute" }, 429);
+    }
+    const body = await c.req.json<{ password: string; nickname: string }>();
     if (!body.password) {
       return c.json({ error: "password required" }, 400);
     }
-    const token = joinRoom(c.req.param("id"), body.password);
+    if (!body.nickname?.trim()) {
+      return c.json({ error: "nickname required" }, 400);
+    }
+    if (body.nickname.trim().length > 30) {
+      return c.json({ error: "nickname too long" }, 400);
+    }
+    const roomId = c.req.param("id");
+    const token = joinRoom(roomId, body.password, body.nickname.trim());
     if (!token) {
       return c.json({ error: "wrong password or room not found" }, 401);
     }
+    c.header("Set-Cookie", `ld_${roomId}=${token}; HttpOnly; SameSite=Strict; Path=/`);
     return c.json({ token });
   });
 
   // --- Room-scoped routes (need token) ---
 
-  function checkAuth(
+  function getToken(
     c: { req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined } },
     roomId: string,
-  ): boolean {
-    const t = c.req.query("t") ?? c.req.header("x-token");
-    return !!t && validateToken(roomId, t);
+  ): string | null {
+    const t = c.req.query("t")
+      ?? c.req.header("x-token")
+      ?? parseCookies(c.req.header("cookie")).get(`ld_${roomId}`)
+      ?? null;
+    if (t && validateToken(roomId, t)) return t;
+    return null;
   }
 
   app.get("/api/rooms/:id/events", (c) => {
     const roomId = c.req.param("id");
-    if (!checkAuth(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
 
     const stream = new ReadableStream({
       start(controller) {
@@ -148,19 +203,21 @@ export function createApp(outputDir: string): Hono {
 
   app.get("/api/rooms/:id/messages", (c) => {
     const roomId = c.req.param("id");
-    if (!checkAuth(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
     const msgs = getMessages(roomId).map(stripPath);
     return c.json({ messages: msgs });
   });
 
   app.post("/api/rooms/:id/messages/text", async (c) => {
     const roomId = c.req.param("id");
-    if (!checkAuth(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    const token = getToken(c, roomId);
+    if (!token) return c.json({ error: "unauthorized" }, 401);
     const body = await c.req.json<{ text: string }>();
     if (typeof body.text !== "string" || !body.text.trim()) {
       return c.json({ error: "expected { text: string }" }, 400);
     }
-    const msg = addTextMessage(roomId, body.text);
+    const sender = getNickname(roomId, token);
+    const msg = addTextMessage(roomId, body.text, sender);
     if (!msg) return c.json({ error: "room not found" }, 404);
     broadcast(roomId, "message", stripPath(msg));
     return c.json({ message: stripPath(msg) });
@@ -168,7 +225,9 @@ export function createApp(outputDir: string): Hono {
 
   app.post("/api/rooms/:id/messages/file", async (c) => {
     const roomId = c.req.param("id");
-    if (!checkAuth(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    const token = getToken(c, roomId);
+    if (!token) return c.json({ error: "unauthorized" }, 401);
+    const sender = getNickname(roomId, token);
 
     const contentType = c.req.header("content-type");
     if (!contentType?.includes("multipart/form-data")) {
@@ -191,7 +250,7 @@ export function createApp(outputDir: string): Hono {
         saveUpload(stream as unknown as Readable, filename, outputDir)
           .then(({ savedPath, savedName }) => {
             const size = statSync(savedPath).size;
-            const msg = addFileMessage(roomId, savedName, savedPath, size);
+            const msg = addFileMessage(roomId, savedName, savedPath, size, sender);
             if (msg) {
               broadcast(roomId, "message", stripPath(msg));
               results.push({ id: msg.id, name: msg.name, size: msg.size });
@@ -230,7 +289,7 @@ export function createApp(outputDir: string): Hono {
 
   app.get("/api/rooms/:id/download/:msgId", (c) => {
     const roomId = c.req.param("id");
-    if (!checkAuth(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
 
     const msg = getMessage(roomId, c.req.param("msgId"));
     if (!msg || msg.type !== "file") {
@@ -284,7 +343,7 @@ export function createApp(outputDir: string): Hono {
 
   app.delete("/api/rooms/:id/messages/:msgId", (c) => {
     const roomId = c.req.param("id");
-    if (!checkAuth(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
     const msgId = c.req.param("msgId");
     if (!deleteMessage(roomId, msgId)) {
       return c.json({ error: "not found" }, 404);

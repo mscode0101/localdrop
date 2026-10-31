@@ -350,6 +350,7 @@
     margin-top: 6px;
     gap: 8px;
   }
+  .msg-sender { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 4px; }
   .msg-time { font-size: 11px; color: var(--text-dim); }
   .msg-actions { display: flex; gap: 4px; }
 
@@ -659,6 +660,8 @@
 <div class="modal-overlay" id="createModal">
   <div class="modal">
     <h2>Create a Room</h2>
+    <label for="createNick">Your nickname</label>
+    <input type="text" id="createNick" placeholder="e.g. Mohit" maxlength="30" autocomplete="off">
     <label for="createName">Room name</label>
     <input type="text" id="createName" placeholder="e.g. Design Team" maxlength="50" autocomplete="off">
     <label for="createPass">Password</label>
@@ -675,6 +678,8 @@
 <div class="modal-overlay" id="joinModal">
   <div class="modal">
     <h2 id="joinTitle">Join Room</h2>
+    <label for="joinNick">Your nickname</label>
+    <input type="text" id="joinNick" placeholder="e.g. Mohit" maxlength="30" autocomplete="off">
     <label for="joinPass">Password</label>
     <input type="password" id="joinPass" placeholder="Enter room password" autocomplete="off">
     <div class="modal-error" id="joinError"></div>
@@ -689,10 +694,9 @@
 
 <script>
 const ROOM_ID = "__ROOM_ID__" || null;
-const TOKEN = new URLSearchParams(window.location.search).get("t");
 const API = ROOM_ID ? "/api/rooms/" + ROOM_ID : null;
-const headers = TOKEN ? { "X-Token": TOKEN } : {};
 const isMobile = window.innerWidth < 768;
+
 
 const SVG_LOCK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 const SVG_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
@@ -715,7 +719,7 @@ function updateLayout() {
   const roomView = document.getElementById("roomView");
 
   if (isMobile) {
-    if (ROOM_ID && TOKEN) {
+    if (ROOM_ID) {
       sidebar.classList.add("hidden");
       main.classList.remove("hidden");
       noRoom.style.display = "none";
@@ -727,7 +731,7 @@ function updateLayout() {
   } else {
     sidebar.classList.remove("hidden");
     main.classList.remove("hidden");
-    if (ROOM_ID && TOKEN) {
+    if (ROOM_ID) {
       noRoom.style.display = "none";
       roomView.style.display = "flex";
     } else {
@@ -772,10 +776,11 @@ function renderRooms(rooms) {
       const openJoin = () => {
         joinRoomId = room.id;
         document.getElementById("joinTitle").textContent = 'Join "' + room.name + '"';
+        document.getElementById("joinNick").value = "";
         document.getElementById("joinPass").value = "";
         document.getElementById("joinError").style.display = "none";
         document.getElementById("joinModal").classList.add("show");
-        document.getElementById("joinPass").focus();
+        document.getElementById("joinNick").focus();
       };
       if (btn) btn.addEventListener("click", (e) => { e.stopPropagation(); openJoin(); });
       card.addEventListener("click", openJoin);
@@ -792,11 +797,12 @@ function showError(id, msg) {
 
 // Create room
 document.getElementById("createBtn").addEventListener("click", () => {
+  document.getElementById("createNick").value = "";
   document.getElementById("createName").value = "";
   document.getElementById("createPass").value = "";
   document.getElementById("createError").style.display = "none";
   document.getElementById("createModal").classList.add("show");
-  document.getElementById("createName").focus();
+  document.getElementById("createNick").focus();
 });
 
 document.getElementById("createCancel").addEventListener("click", () => {
@@ -804,8 +810,10 @@ document.getElementById("createCancel").addEventListener("click", () => {
 });
 
 document.getElementById("createConfirm").addEventListener("click", async () => {
+  const nickname = document.getElementById("createNick").value.trim();
   const name = document.getElementById("createName").value.trim();
   const password = document.getElementById("createPass").value;
+  if (!nickname) { showError("createError", "Nickname is required"); return; }
   if (!name) { showError("createError", "Room name is required"); return; }
   if (!password) { showError("createError", "Password is required"); return; }
 
@@ -815,11 +823,12 @@ document.getElementById("createConfirm").addEventListener("click", async () => {
     const res = await fetch("/api/rooms", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, password }),
+      credentials: "same-origin",
+      body: JSON.stringify({ name, password, nickname }),
     });
     const data = await res.json();
     if (res.ok) {
-      window.location.href = "/room/" + data.id + "?t=" + data.token;
+      window.location.href = "/room/" + data.id;
     } else {
       showError("createError", data.error || "Failed to create room");
     }
@@ -837,7 +846,9 @@ document.getElementById("joinCancel").addEventListener("click", () => {
 });
 
 document.getElementById("joinConfirm").addEventListener("click", async () => {
+  const nickname = document.getElementById("joinNick").value.trim();
   const password = document.getElementById("joinPass").value;
+  if (!nickname) { showError("joinError", "Nickname is required"); return; }
   if (!password) { showError("joinError", "Password is required"); return; }
 
   const btn = document.getElementById("joinConfirm");
@@ -846,13 +857,14 @@ document.getElementById("joinConfirm").addEventListener("click", async () => {
     const res = await fetch("/api/rooms/" + joinRoomId + "/join", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
+      credentials: "same-origin",
+      body: JSON.stringify({ password, nickname }),
     });
     const data = await res.json();
     if (res.ok) {
-      window.location.href = "/room/" + joinRoomId + "?t=" + data.token;
+      window.location.href = "/room/" + joinRoomId;
     } else {
-      showError("joinError", "Wrong password");
+      showError("joinError", data.error || "Wrong password");
     }
   } catch {
     showError("joinError", "Connection failed");
@@ -862,11 +874,17 @@ document.getElementById("joinConfirm").addEventListener("click", async () => {
 });
 
 // Keyboard shortcuts for modals
+document.getElementById("createNick").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("createName").focus();
+});
 document.getElementById("createName").addEventListener("keydown", (e) => {
   if (e.key === "Enter") document.getElementById("createPass").focus();
 });
 document.getElementById("createPass").addEventListener("keydown", (e) => {
   if (e.key === "Enter") document.getElementById("createConfirm").click();
+});
+document.getElementById("joinNick").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("joinPass").focus();
 });
 document.getElementById("joinPass").addEventListener("keydown", (e) => {
   if (e.key === "Enter") document.getElementById("joinConfirm").click();
@@ -902,7 +920,7 @@ document.getElementById("refreshBtn").addEventListener("click", () => {
 });
 
 // ===== Chat functionality (only when in a room) =====
-if (ROOM_ID && TOKEN) {
+if (ROOM_ID) {
 
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -959,11 +977,12 @@ function renderMessage(msg) {
   div.dataset.id = msg.id;
   const isLong = msg.type === "text" && (msg.text.length > 300 || msg.text.split("\n").length > 6);
 
+  const senderHtml = msg.sender ? '<div class="msg-sender">' + esc(msg.sender) + '</div>' : '';
   let content = "";
   if (msg.type === "text") {
-    content = '<div class="msg-text' + (isLong ? " clamped" : "") + '">' + esc(msg.text) + "</div>" + (isLong ? '<button class="btn-more">Show more</button>' : "");
+    content = senderHtml + '<div class="msg-text' + (isLong ? " clamped" : "") + '">' + esc(msg.text) + "</div>" + (isLong ? '<button class="btn-more">Show more</button>' : "");
   } else {
-    content = '<div class="msg-file"><div class="msg-file-icon">' + SVG_FILE + '</div><div class="msg-file-info"><div class="msg-file-name">' + esc(msg.name) + '</div><div class="msg-file-size">' + formatSize(msg.size) + '</div></div><a class="btn-dl" href="' + API + "/download/" + msg.id + "?t=" + TOKEN + '" download="' + esc(msg.name) + '">' + SVG_DL + " Save</a></div>";
+    content = senderHtml + '<div class="msg-file"><div class="msg-file-icon">' + SVG_FILE + '</div><div class="msg-file-info"><div class="msg-file-name">' + esc(msg.name) + '</div><div class="msg-file-size">' + formatSize(msg.size) + '</div></div><a class="btn-dl" href="' + API + "/download/" + msg.id + '" download="' + esc(msg.name) + '">' + SVG_DL + " Save</a></div>";
   }
 
   const copyData = msg.type === "text" ? msg.text : msg.name;
@@ -1003,7 +1022,7 @@ function setEmptyVisible(visible) {
 
 async function loadMessages() {
   try {
-    const res = await fetch(API + "/messages?t=" + TOKEN);
+    const res = await fetch(API + "/messages", { credentials: "same-origin" });
     if (res.status === 401) { window.location.href = "/"; return; }
     const data = await res.json();
     const chat = document.getElementById("chat");
@@ -1031,9 +1050,10 @@ async function sendText() {
   const btn = document.getElementById("sendBtn");
   btn.disabled = true;
   try {
-    const res = await fetch(API + "/messages/text?t=" + TOKEN, {
+    const res = await fetch(API + "/messages/text", {
       method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({ text }),
     });
     if (res.status === 401) { window.location.href = "/"; return; }
@@ -1055,8 +1075,8 @@ function uploadFiles(fileList) {
     const form = new FormData();
     form.append("file", file);
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", API + "/messages/file?t=" + TOKEN);
-    xhr.setRequestHeader("X-Token", TOKEN);
+    xhr.open("POST", API + "/messages/file");
+    xhr.withCredentials = true;
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) { const p = Math.round((e.loaded / e.total) * 100); fill.style.width = p + "%"; pct.textContent = p + "%"; }
     });
@@ -1074,7 +1094,7 @@ function uploadFiles(fileList) {
 }
 
 async function deleteMsg(id) {
-  try { await fetch(API + "/messages/" + id + "?t=" + TOKEN, { method: "DELETE", headers }); removeMessage(id); }
+  try { await fetch(API + "/messages/" + id, { method: "DELETE", credentials: "same-origin" }); removeMessage(id); }
   catch (e) { console.error("Delete failed", e); }
 }
 
@@ -1124,7 +1144,7 @@ loadMessages().then(() => {
 });
 
 function connectSSE() {
-  const es = new EventSource(API + "/events?t=" + TOKEN);
+  const es = new EventSource(API + "/events");
   es.addEventListener("message", (e) => { try { appendMessage(JSON.parse(e.data)); } catch {} });
   es.addEventListener("delete", (e) => { try { removeMessage(JSON.parse(e.data).id); } catch {} });
   es.addEventListener("presence", (e) => {
@@ -1133,7 +1153,7 @@ function connectSSE() {
   es.onerror = () => { es.close(); setTimeout(connectSSE, 2000); };
 }
 
-} // end if (ROOM_ID && TOKEN)
+} // end if (ROOM_ID)
 </script>
 </body>
 </html>
