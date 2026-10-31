@@ -759,16 +759,6 @@ function renderRooms(rooms) {
   }
 }
 
-async function loadRooms() {
-  try {
-    const res = await fetch("/api/rooms");
-    const data = await res.json();
-    renderRooms(data.rooms);
-  } catch (e) {
-    console.error("Failed to load rooms", e);
-  }
-}
-
 function showError(id, msg) {
   const el = document.getElementById(id);
   el.textContent = msg;
@@ -864,6 +854,22 @@ document.getElementById("createModal").addEventListener("click", (e) => {
 document.getElementById("joinModal").addEventListener("click", (e) => {
   if (e.target === e.currentTarget) document.getElementById("joinCancel").click();
 });
+
+let lastRoomsJSON = "";
+
+async function loadRooms() {
+  try {
+    const res = await fetch("/api/rooms");
+    const data = await res.json();
+    const json = JSON.stringify(data.rooms);
+    if (json !== lastRoomsJSON) {
+      lastRoomsJSON = json;
+      renderRooms(data.rooms);
+    }
+  } catch (e) {
+    console.error("Failed to load rooms", e);
+  }
+}
 
 loadRooms();
 setInterval(loadRooms, 3000);
