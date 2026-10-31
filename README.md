@@ -198,6 +198,12 @@ curl -b cookies.txt http://host:7431/api/rooms/ROOM_ID/system
 
 **Workshops & classrooms** — Create a room, share the QR code on the projector, everyone's connected.
 
+## AI Agent Skill
+
+LocalDrop ships with a built-in [Claude Code skill](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/skills) for AI agent orchestration. Any AI agent working in this repo can invoke `/localdrop-orchestrate` to get the full playbook — API usage, security model, sandbox rules, and best practices.
+
+See [`.claude/skills/localdrop-orchestrate.md`](.claude/skills/localdrop-orchestrate.md) for the complete guide.
+
 ## Security
 
 - All communication stays on your local network
