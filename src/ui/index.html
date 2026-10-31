@@ -47,6 +47,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
   }
 
   /* ===== Sidebar ===== */
@@ -269,7 +270,9 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   .chat-empty {
@@ -603,7 +606,9 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
     font-size: 13px;
   }
