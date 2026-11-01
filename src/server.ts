@@ -247,7 +247,7 @@ export function createApp(outputDir: string, defaultSyncDir?: string): Hono {
     const results: Array<{ id: string; name: string; size: number }> = [];
 
     await new Promise<void>((resolve, reject) => {
-      const bb = Busboy({ headers: { "content-type": contentType } });
+      const bb = Busboy({ headers: { "content-type": contentType }, defParamCharset: "utf8" });
       let pending = 0;
       let finished = false;
 
@@ -312,8 +312,9 @@ export function createApp(outputDir: string, defaultSyncDir?: string): Hono {
     }
 
     const range = c.req.header("range");
+    const asciiName = file.name.replace(/[^\x20-\x7E]/g, "_").replace(/"/g, '\\"');
     const encodedName = encodeURIComponent(file.name).replace(/%20/g, "+");
-    const disposition = `attachment; filename="${file.name.replace(/"/g, '\\"')}"; filename*=UTF-8''${encodedName}`;
+    const disposition = `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`;
 
     if (range) {
       const match = range.match(/bytes=(\d+)-(\d*)/);

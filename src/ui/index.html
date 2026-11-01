@@ -375,6 +375,7 @@
   .btn-icon.copied { color: var(--success); }
 
   .btn-dl {
+    font-family: inherit;
     padding: 5px 12px;
     border: none;
     border-radius: 6px;
@@ -791,11 +792,11 @@
 
       <div class="compose">
         <label class="compose-attach" title="Attach files">
-          +
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           <input type="file" id="fileInput" multiple>
         </label>
-        <textarea class="compose-input" id="textInput" placeholder="Type a message..." rows="1"></textarea>
-        <button class="compose-send" id="sendBtn" title="Send">&#9654;</button>
+        <textarea class="compose-input" id="textInput" placeholder="Type a message or paste a file..." rows="1"></textarea>
+        <button class="compose-send" id="sendBtn" title="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
       </div>
     </div>
   </main>
@@ -849,11 +850,28 @@ const SVG_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 const SVG_TRASH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 const SVG_DL = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
 const SVG_FILE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>';
+const SVG_IMAGE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+const SVG_VIDEO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.934a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>';
+const SVG_AUDIO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+const SVG_CODE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>';
+const SVG_ARCHIVE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>';
+const SVG_PAPERCLIP = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+const SVG_SEND = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
 
 function esc(s) {
   const d = document.createElement("div");
   d.textContent = s;
   return d.innerHTML;
+}
+
+function getFileIcon(name) {
+  var ext = (name.split('.').pop() || '').toLowerCase();
+  if (['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic'].indexOf(ext) >= 0) return { svg: SVG_IMAGE, color: '#10b981' };
+  if (['mp4','mov','avi','mkv','webm','flv','wmv'].indexOf(ext) >= 0) return { svg: SVG_VIDEO, color: '#f59e0b' };
+  if (['mp3','wav','ogg','flac','aac','m4a','wma'].indexOf(ext) >= 0) return { svg: SVG_AUDIO, color: '#8b5cf6' };
+  if (['zip','tar','gz','rar','7z','bz2','xz'].indexOf(ext) >= 0) return { svg: SVG_ARCHIVE, color: '#f97316' };
+  if (['js','ts','py','java','c','cpp','go','rs','rb','php','html','css','json','xml','yaml','yml','sh','sql'].indexOf(ext) >= 0) return { svg: SVG_CODE, color: '#06b6d4' };
+  return { svg: SVG_FILE, color: 'var(--accent)' };
 }
 
 // ===== Layout: show sidebar or chat depending on state =====
@@ -1127,7 +1145,8 @@ function renderMessage(msg) {
   if (msg.type === "text") {
     content = senderHtml + '<div class="msg-text' + (isLong ? " clamped" : "") + '">' + esc(msg.text) + "</div>" + (isLong ? '<button class="btn-more">Show more</button>' : "");
   } else {
-    content = senderHtml + '<div class="msg-file"><div class="msg-file-icon">' + SVG_FILE + '</div><div class="msg-file-info"><div class="msg-file-name">' + esc(msg.name) + '</div><div class="msg-file-size">' + formatSize(msg.size) + '</div></div><a class="btn-dl" href="' + API + "/download/" + msg.id + '" download="' + esc(msg.name) + '">' + SVG_DL + " Save</a></div>";
+    var fi = getFileIcon(msg.name);
+    content = senderHtml + '<div class="msg-file"><div class="msg-file-icon" style="background:' + fi.color + '">' + fi.svg + '</div><div class="msg-file-info"><div class="msg-file-name">' + esc(msg.name) + '</div><div class="msg-file-size">' + formatSize(msg.size) + '</div></div><button class="btn-dl" data-dl="1">' + SVG_DL + " Save</button></div>";
   }
 
   const copyData = msg.type === "text" ? msg.text : msg.name;
@@ -1135,6 +1154,8 @@ function renderMessage(msg) {
 
   div.querySelector(".btn-copy").addEventListener("click", function() { copyText(copyData, this); });
   div.querySelector(".btn-del").addEventListener("click", () => deleteMsg(msg.id));
+  var dlBtn = div.querySelector("[data-dl]");
+  if (dlBtn) dlBtn.addEventListener("click", function() { downloadFile(msg.id, msg.name); });
 
   const moreBtn = div.querySelector(".btn-more");
   if (moreBtn) {
@@ -1186,6 +1207,22 @@ async function loadMessages() {
   } catch (e) {
     console.error("Failed to load messages", e);
   }
+}
+
+async function downloadFile(msgId, fileName) {
+  try {
+    var res = await fetch(API + "/download/" + msgId, { credentials: "same-origin" });
+    if (res.status === 401) { window.location.href = "/"; return; }
+    if (!res.ok) { showToast("Download failed"); return; }
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    requestAnimationFrame(function() { document.body.removeChild(a); URL.revokeObjectURL(url); });
+  } catch(e) { showToast("Download failed"); }
 }
 
 async function sendText() {
@@ -1258,6 +1295,23 @@ textInput.addEventListener("input", () => {
 textInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } });
 sendBtn.addEventListener("click", sendText);
 fileInput.addEventListener("change", () => { uploadFiles(fileInput.files); fileInput.value = ""; });
+
+textInput.addEventListener("paste", function(e) {
+  var items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  var files = [];
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].kind === "file") {
+      var f = items[i].getAsFile();
+      if (f) files.push(f);
+    }
+  }
+  if (files.length > 0) {
+    e.preventDefault();
+    uploadFiles(files);
+    showToast("Uploading pasted file...");
+  }
+});
 
 const chatEl = document.getElementById("chat");
 chatEl.addEventListener("dragover", (e) => { e.preventDefault(); });
