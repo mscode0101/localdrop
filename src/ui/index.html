@@ -778,6 +778,9 @@
           <button class="active" data-tab="chat">Chat</button>
           <button data-tab="system">System</button>
         </div>
+        <button class="btn-refresh" id="settingsBtn" title="Room settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
       </div>
 
       <div class="chat" id="chat">
@@ -836,12 +839,33 @@
   </div>
 </div>
 
+<!-- Change Password modal -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal">
+    <h2>Change Room Password</h2>
+    <label for="newPass">New password</label>
+    <input type="password" id="newPass" placeholder="Enter new password" autocomplete="off">
+    <label for="confirmPass">Confirm password</label>
+    <input type="password" id="confirmPass" placeholder="Confirm new password" autocomplete="off">
+    <div class="modal-error" id="passwordError"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="passwordCancel">Cancel</button>
+      <button class="btn-confirm" id="passwordConfirm">Change</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 const ROOM_ID = "__ROOM_ID__" || null;
 const API = ROOM_ID ? "/api/rooms/" + ROOM_ID : null;
 const isMobile = window.innerWidth < 768;
+
+function getSavedNick() { try { return localStorage.getItem("ld_nickname") || ""; } catch { return ""; } }
+function saveNick(n) { try { localStorage.setItem("ld_nickname", n); } catch {} }
+function markJoined(roomId) { try { localStorage.setItem("ld_joined_" + roomId, String(Date.now())); } catch {} }
+function isJoined(roomId) { try { var t = localStorage.getItem("ld_joined_" + roomId); if (!t) return false; return Date.now() - Number(t) < 86400000; } catch { return false; } }
 
 
 const SVG_LOCK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
@@ -922,28 +946,35 @@ function renderRooms(rooms) {
 
   for (const room of rooms) {
     const isActive = room.id === ROOM_ID;
+    const joined = isJoined(room.id);
     const card = document.createElement("div");
     card.className = "room-card" + (isActive ? " active" : "");
+    var btnLabel = isActive ? '' : joined ? '<button class="btn-join" style="background:var(--success)">Open</button>' : '<button class="btn-join">Join</button>';
     card.innerHTML =
       '<div class="room-icon">' + SVG_LOCK + '</div>' +
       '<div class="room-info">' +
         '<div class="room-name">' + esc(room.name) + '</div>' +
         '<div class="room-meta"><span class="dot"></span>' + room.online + ' online</div>' +
-      '</div>' +
-      (isActive ? '' : '<button class="btn-join">Join</button>');
+      '</div>' + btnLabel;
 
     if (isActive) {
       card.style.cursor = "default";
+    } else if (joined) {
+      const goToRoom = () => { window.location.href = "/room/" + room.id; };
+      const btn = card.querySelector(".btn-join");
+      if (btn) btn.addEventListener("click", (e) => { e.stopPropagation(); goToRoom(); });
+      card.addEventListener("click", goToRoom);
     } else {
       const btn = card.querySelector(".btn-join");
       const openJoin = () => {
         joinRoomId = room.id;
         document.getElementById("joinTitle").textContent = 'Join "' + room.name + '"';
-        document.getElementById("joinNick").value = "";
+        document.getElementById("joinNick").value = getSavedNick();
         document.getElementById("joinPass").value = "";
         document.getElementById("joinError").style.display = "none";
         document.getElementById("joinModal").classList.add("show");
-        document.getElementById("joinNick").focus();
+        if (getSavedNick()) { document.getElementById("joinPass").focus(); }
+        else { document.getElementById("joinNick").focus(); }
       };
       if (btn) btn.addEventListener("click", (e) => { e.stopPropagation(); openJoin(); });
       card.addEventListener("click", openJoin);
@@ -960,12 +991,13 @@ function showError(id, msg) {
 
 // Create room
 document.getElementById("createBtn").addEventListener("click", () => {
-  document.getElementById("createNick").value = "";
+  document.getElementById("createNick").value = getSavedNick();
   document.getElementById("createName").value = "";
   document.getElementById("createPass").value = "";
   document.getElementById("createError").style.display = "none";
   document.getElementById("createModal").classList.add("show");
-  document.getElementById("createNick").focus();
+  if (getSavedNick()) { document.getElementById("createName").focus(); }
+  else { document.getElementById("createNick").focus(); }
 });
 
 document.getElementById("createCancel").addEventListener("click", () => {
@@ -991,6 +1023,8 @@ document.getElementById("createConfirm").addEventListener("click", async () => {
     });
     const data = await res.json();
     if (res.ok) {
+      saveNick(nickname);
+      markJoined(data.id);
       window.location.href = "/room/" + data.id;
     } else {
       showError("createError", data.error || "Failed to create room");
@@ -1025,6 +1059,8 @@ document.getElementById("joinConfirm").addEventListener("click", async () => {
     });
     const data = await res.json();
     if (res.ok) {
+      saveNick(nickname);
+      markJoined(joinRoomId);
       window.location.href = "/room/" + joinRoomId;
     } else {
       showError("joinError", data.error || "Wrong password");
@@ -1084,6 +1120,7 @@ document.getElementById("refreshBtn").addEventListener("click", () => {
 
 // ===== Chat functionality (only when in a room) =====
 if (ROOM_ID) {
+markJoined(ROOM_ID);
 
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + " B";
@@ -1504,6 +1541,56 @@ function handleSystemEvent(msg) {
     updateSystemStatus(msg.commandId, msg.status);
   }
 }
+
+// Settings: change password
+document.getElementById("settingsBtn").addEventListener("click", () => {
+  document.getElementById("newPass").value = "";
+  document.getElementById("confirmPass").value = "";
+  document.getElementById("passwordError").style.display = "none";
+  document.getElementById("passwordModal").classList.add("show");
+  document.getElementById("newPass").focus();
+});
+
+document.getElementById("passwordCancel").addEventListener("click", () => {
+  document.getElementById("passwordModal").classList.remove("show");
+});
+
+document.getElementById("passwordModal").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) document.getElementById("passwordCancel").click();
+});
+
+document.getElementById("newPass").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("confirmPass").focus();
+});
+document.getElementById("confirmPass").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("passwordConfirm").click();
+});
+
+document.getElementById("passwordConfirm").addEventListener("click", async () => {
+  var pw = document.getElementById("newPass").value;
+  var cpw = document.getElementById("confirmPass").value;
+  if (!pw) { showError("passwordError", "Password is required"); return; }
+  if (pw !== cpw) { showError("passwordError", "Passwords do not match"); return; }
+
+  var btn = document.getElementById("passwordConfirm");
+  btn.disabled = true;
+  try {
+    var res = await fetch(API + "/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ password: pw }),
+    });
+    if (res.ok) {
+      document.getElementById("passwordModal").classList.remove("show");
+      showToast("Password changed");
+    } else {
+      var data = await res.json();
+      showError("passwordError", data.error || "Failed to change password");
+    }
+  } catch { showError("passwordError", "Connection failed"); }
+  finally { btn.disabled = false; }
+});
 
 } // end if (ROOM_ID)
 </script>

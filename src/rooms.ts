@@ -411,3 +411,13 @@ export function setSyncDir(roomId: string, dir: string): boolean {
 export function getSyncDir(roomId: string): string | null {
   return rooms.get(roomId)?.syncDir ?? null;
 }
+
+export function changePassword(roomId: string, newPassword: string): boolean {
+  const room = rooms.get(roomId);
+  if (!room) return false;
+  const salt = randomBytes(16).toString("hex");
+  room.passwordHash = hash(newPassword, salt);
+  room.salt = salt;
+  saveRoom(roomId);
+  return true;
+}

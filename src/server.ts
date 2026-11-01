@@ -28,6 +28,7 @@ import {
   getSystemMessages,
   setSyncDir,
   getSyncDir,
+  changePassword,
   type FileMessage,
 } from "./rooms.js";
 
@@ -114,7 +115,7 @@ export function createApp(outputDir: string, defaultSyncDir?: string): Hono {
     }
     const result = createRoom(body.name, body.password, body.nickname.trim());
     if (defaultSyncDir) setSyncDir(result.id, defaultSyncDir);
-    c.header("Set-Cookie", `ld_${result.id}=${result.token}; HttpOnly; SameSite=Strict; Path=/`);
+    c.header("Set-Cookie", `ld_${result.id}=${result.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`);
     return c.json(result);
   });
 
@@ -138,7 +139,7 @@ export function createApp(outputDir: string, defaultSyncDir?: string): Hono {
     if (!token) {
       return c.json({ error: "wrong password or room not found" }, 401);
     }
-    c.header("Set-Cookie", `ld_${roomId}=${token}; HttpOnly; SameSite=Strict; Path=/`);
+    c.header("Set-Cookie", `ld_${roomId}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`);
     return c.json({ token });
   });
 
@@ -448,6 +449,21 @@ export function createApp(outputDir: string, defaultSyncDir?: string): Hono {
       return c.json({ error: "not found" }, 404);
     }
     broadcast(roomId, "delete", { id: msgId });
+    return c.json({ ok: true });
+  });
+
+  // --- Change room password ---
+
+  app.post("/api/rooms/:id/password", async (c) => {
+    const roomId = c.req.param("id");
+    if (!getToken(c, roomId)) return c.json({ error: "unauthorized" }, 401);
+    const body = await c.req.json<{ password: string }>();
+    if (!body.password) {
+      return c.json({ error: "new password required" }, 400);
+    }
+    if (!changePassword(roomId, body.password)) {
+      return c.json({ error: "room not found" }, 404);
+    }
     return c.json({ ok: true });
   });
 
